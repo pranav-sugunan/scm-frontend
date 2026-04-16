@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Analytics — SCM Platform</title>
+  <link rel="stylesheet" href="../css/global.css"/>
+  <link rel="stylesheet" href="../css/layout.css"/>
+  <link rel="stylesheet" href="../css/components.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <div id="sidebar-container"></div>
+
+    <div style="flex:1;min-width:0">
+      <div id="navbar-container"></div>
+
+      <main class="main-content">
+
+        <!-- Page Header -->
+        <div class="page-header">
+          <div class="page-header__left">
+            <h1 class="page-header__title">Analytics & Forecasting</h1>
+            <p class="page-header__subtitle">Anomaly detection, demand forecasting, operational insights</p>
+          </div>
+          <div class="page-header__actions">
+            <button class="btn btn--primary" id="detect-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              Run Detection
+            </button>
+          </div>
+        </div>
+
+        <!-- Anomaly Summary KPIs -->
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:1.75rem">
+          <div class="kpi-card kpi-card--blue">
+            <div class="kpi-card__header">
+              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--blue">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0
+                    012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-card__value" id="stat-total-anom">—</div>
+            <div class="kpi-card__label">Total Anomalies</div>
+          </div>
+
+          <div class="kpi-card kpi-card--red">
+            <div class="kpi-card__header">
+              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--red">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-card__value" id="stat-critical">—</div>
+            <div class="kpi-card__label">Critical</div>
+          </div>
+
+          <div class="kpi-card kpi-card--yellow">
+            <div class="kpi-card__header">
+              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--yellow">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-card__value" id="stat-warnings">—</div>
+            <div class="kpi-card__label">Warnings</div>
+          </div>
+
+          <div class="kpi-card kpi-card--green">
+            <div class="kpi-card__header">
+              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--green">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-card__value" id="stat-info-anom">—</div>
+            <div class="kpi-card__label">Informational</div>
+          </div>
+        </div>
+
+        <!-- Two-column layout: Anomalies list + Insights/Chart -->
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:1rem;margin-bottom:1.75rem">
+
+          <!-- Anomalies List -->
+          <div>
+            <div class="section-header">
+              <div>
+                <div class="section-title">
+                  Detected Anomalies
+                  <span class="badge badge--danger" id="anomaly-count" style="margin-left:.5rem">0</span>
+                </div>
+                <div class="section-subtitle">Sorted by severity · Auto-refreshes every 10s</div>
+              </div>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <select class="toolbar__select" id="filter-severity" style="height:32px;font-size:.8125rem">
+                  <option value="">All Severities</option>
+                  <option value="critical">Critical</option>
+                  <option value="warning">Warning</option>
+                  <option value="info">Info</option>
+                </select>
+              </div>
+            </div>
+            <div id="anomalies-container">
+              <div class="skeleton" style="height:300px;border-radius:14px"></div>
+            </div>
+          </div>
+
+          <!-- Right panel: Insights + Chart -->
+          <div style="display:flex;flex-direction:column;gap:1rem">
+
+            <!-- Operational Insights -->
+            <div class="card">
+              <div class="card__header">
+                <div class="card__title">Operational Insights</div>
+              </div>
+              <div class="card__body" id="insights-container">
+                <div class="skeleton" style="height:150px;border-radius:8px"></div>
+              </div>
+            </div>
+
+            <!-- Anomaly Severity Chart -->
+            <div class="chart-card">
+              <div class="chart-card__header">
+                <div class="chart-card__title">By Severity</div>
+              </div>
+              <div class="chart-card__body">
+                <div class="chart-wrapper" style="height:200px">
+                  <canvas id="anomaly-severity-chart"></canvas>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Demand Forecasting -->
+        <div class="section">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Demand Forecasting</div>
+              <div class="section-subtitle">Enter a product ID or SKU to view demand predictions</div>
+            </div>
+          </div>
+
+          <!-- Forecast Search -->
+          <div class="card" style="margin-bottom:1rem">
+            <div class="card__body">
+              <div style="display:flex;gap:.75rem;align-items:center">
+                <div style="flex:1;position:relative">
+                  <input type="text" class="form-input" id="forecast-product-input"
+                    placeholder="Enter product ID or SKU (e.g. SKU-001, PROD-123)…"
+                    autocomplete="off" style="padding-left:2.5rem"/>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--clr-text-muted)">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                  </svg>
+                </div>
+                <button class="btn btn--primary" id="forecast-search-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0
+                      012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                  Get Forecast
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Forecast Chart Container -->
+          <div id="forecast-container">
+            <div class="empty-state">
+              <div class="empty-state__icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0
+                    012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+              </div>
+              <div class="empty-state__title">No forecast loaded</div>
+              <div class="empty-state__description">Enter a product ID above to load demand predictions.</div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script type="module" src="../js/analytics.js"></script>
+</body>
+</html>

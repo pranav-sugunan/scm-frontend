@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — SCM Platform</title>
+  <link rel="stylesheet" href="../css/global.css"/>
+  <link rel="stylesheet" href="../css/layout.css"/>
+  <link rel="stylesheet" href="../css/components.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar injected by JS -->
+    <div id="sidebar-container"></div>
+
+    <div style="flex:1;min-width:0">
+      <!-- Navbar injected by JS -->
+      <div id="navbar-container"></div>
+
+      <!-- Main Content -->
+      <main class="main-content">
+
+        <!-- Page Header -->
+        <div class="page-header">
+          <div class="page-header__left">
+            <h1 class="page-header__title">Operations Dashboard</h1>
+            <p class="page-header__subtitle">Real-time supply chain visibility — auto-refreshes every 10s</p>
+          </div>
+          <div class="page-header__actions">
+            <button class="btn btn--secondary btn--sm" onclick="window.location.reload()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid" id="kpi-container">
+          <!-- Skeleton loading -->
+          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
+          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
+          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
+          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-grid">
+          <!-- Orders Over Time -->
+          <div class="chart-card">
+            <div class="chart-card__header">
+              <div>
+                <div class="chart-card__title">Orders Over Time</div>
+                <div class="chart-card__subtitle">Daily order volume trend</div>
+              </div>
+              <span class="badge badge--info">Live</span>
+            </div>
+            <div class="chart-card__body">
+              <div class="chart-wrapper">
+                <canvas id="orders-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inventory Distribution -->
+          <div class="chart-card">
+            <div class="chart-card__header">
+              <div>
+                <div class="chart-card__title">Inventory Distribution</div>
+                <div class="chart-card__subtitle">Stock by category</div>
+              </div>
+            </div>
+            <div class="chart-card__body">
+              <div class="chart-wrapper">
+                <canvas id="inventory-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Row: Recent Orders + Alerts -->
+        <div class="two-col-grid" style="gap:1rem">
+          <!-- Recent Orders -->
+          <div class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Recent Orders</div>
+                <div class="section-subtitle">Latest 8 orders</div>
+              </div>
+              <a href="orders.html" class="btn btn--ghost btn--sm">
+                View all
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </a>
+            </div>
+            <div id="recent-orders-container">
+              <div class="skeleton" style="height:200px;border-radius:10px"></div>
+            </div>
+          </div>
+
+          <!-- Low Stock Alerts -->
+          <div class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-title">Stock Alerts</div>
+                <div class="section-subtitle">Items below reorder point</div>
+              </div>
+              <a href="inventory.html" class="btn btn--ghost btn--sm">
+                View all
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </a>
+            </div>
+            <div id="alerts-container">
+              <div class="skeleton" style="height:200px;border-radius:10px"></div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script type="module" src="../js/dashboard.js"></script>
+</body>
+</html>
