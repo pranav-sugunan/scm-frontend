@@ -1,202 +1,442 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Shipments — SCM Platform</title>
-  <link rel="stylesheet" href="../css/global.css"/>
-  <link rel="stylesheet" href="../css/layout.css"/>
-  <link rel="stylesheet" href="../css/components.css"/>
-</head>
-<body>
-  <div class="app-shell">
-    <div id="sidebar-container"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shipments — SCM Platform</title>
+    <link rel="stylesheet" href="../css/global.css" />
+    <link rel="stylesheet" href="../css/layout.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <div id="sidebar-container"></div>
 
-    <div style="flex:1;min-width:0">
-      <div id="navbar-container"></div>
+      <div style="flex: 1; min-width: 0">
+        <div id="navbar-container"></div>
 
-      <main class="main-content">
-
-        <!-- Page Header -->
-        <div class="page-header">
-          <div class="page-header__left">
-            <h1 class="page-header__title">Shipments</h1>
-            <p class="page-header__subtitle">Track deliveries, manage status, view timelines</p>
-          </div>
-          <div class="page-header__actions">
-            <span class="badge badge--info" style="font-size:.75rem;padding:.375rem .75rem">
-              Auto-refresh 10s
-            </span>
-          </div>
-        </div>
-
-        <!-- Shipment KPIs -->
-        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:1.75rem">
-          <div class="kpi-card kpi-card--blue">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--blue">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0
-                    011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1"/>
-                </svg>
-              </div>
+        <main class="main-content">
+          <!-- Page Header -->
+          <div class="page-header">
+            <div class="page-header__left">
+              <h1 class="page-header__title">Shipments</h1>
+              <p class="page-header__subtitle">
+                Track deliveries, manage status, view timelines
+              </p>
             </div>
-            <div class="kpi-card__value" id="stat-total-shipments">—</div>
-            <div class="kpi-card__label">Total Shipments</div>
-          </div>
-
-          <div class="kpi-card kpi-card--purple">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--purple">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-card__value" id="stat-in-transit">—</div>
-            <div class="kpi-card__label">In Transit</div>
-          </div>
-
-          <div class="kpi-card kpi-card--red">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--red">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-card__value" id="stat-delayed">—</div>
-            <div class="kpi-card__label">Delayed</div>
-          </div>
-
-          <div class="kpi-card kpi-card--green">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--green">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-card__value" id="stat-delivered">—</div>
-            <div class="kpi-card__label">Delivered</div>
-          </div>
-        </div>
-
-        <!-- Tracking Panel -->
-        <div class="card" style="margin-bottom:1.5rem">
-          <div class="card__header">
-            <div>
-              <div class="card__title">Track a Shipment</div>
-              <div class="card__subtitle">Enter a tracking number to view live status</div>
-            </div>
-          </div>
-          <div class="card__body">
-            <div style="display:flex;gap:.75rem;align-items:center">
-              <div style="flex:1;position:relative">
-                <input type="text" class="form-input" id="tracking-input"
-                  placeholder="Enter tracking number (e.g. TRK-001234)…" autocomplete="off"
-                  style="padding-left:2.5rem"/>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                  style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--clr-text-muted)">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6
-                    3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-                </svg>
-              </div>
-              <button class="btn btn--primary" id="track-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-                Track
+            <div class="page-header__actions">
+              <button class="btn btn--primary btn--sm" id="create-shipment-btn">
+                + New Shipment
               </button>
+              <button
+                class="btn btn--secondary btn--sm"
+                id="create-carrier-btn"
+              >
+                + Carrier
+              </button>
+              <span
+                class="badge badge--info"
+                style="font-size: 0.75rem; padding: 0.375rem 0.75rem"
+              >
+                Auto-refresh 10s
+              </span>
             </div>
-            <!-- Tracking result -->
-            <div id="tracking-result" class="hidden" style="margin-top:1rem"></div>
+          </div>
+
+          <!-- Shipment KPIs -->
+          <div
+            class="kpi-grid"
+            style="
+              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              margin-bottom: 1.75rem;
+            "
+          >
+            <div class="kpi-card kpi-card--blue">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--blue">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0
+                    011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-total-shipments">—</div>
+              <div class="kpi-card__label">Total Shipments</div>
+            </div>
+
+            <div class="kpi-card kpi-card--purple">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--purple">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-in-transit">—</div>
+              <div class="kpi-card__label">In Transit</div>
+            </div>
+
+            <div class="kpi-card kpi-card--red">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--red">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-delayed">—</div>
+              <div class="kpi-card__label">Delayed</div>
+            </div>
+
+            <div class="kpi-card kpi-card--green">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--green">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-delivered">—</div>
+              <div class="kpi-card__label">Delivered</div>
+            </div>
+          </div>
+
+          <!-- Tracking Panel -->
+          <div class="card" style="margin-bottom: 1.5rem">
+            <div class="card__header">
+              <div>
+                <div class="card__title">Track a Shipment</div>
+                <div class="card__subtitle">
+                  Enter a tracking number to view live status
+                </div>
+              </div>
+            </div>
+            <div class="card__body">
+              <div style="display: flex; gap: 0.75rem; align-items: center">
+                <div style="flex: 1; position: relative">
+                  <input
+                    type="text"
+                    class="form-input"
+                    id="tracking-input"
+                    placeholder="Enter tracking number (e.g. TRK-001234)…"
+                    autocomplete="off"
+                    style="padding-left: 2.5rem"
+                  />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    style="
+                      position: absolute;
+                      left: 0.75rem;
+                      top: 50%;
+                      transform: translateY(-50%);
+                      width: 16px;
+                      height: 16px;
+                      color: var(--clr-text-muted);
+                    "
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6
+                    3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                    />
+                  </svg>
+                </div>
+                <button class="btn btn--primary" id="track-btn">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  Track
+                </button>
+              </div>
+              <!-- Tracking result -->
+              <div
+                id="tracking-result"
+                class="hidden"
+                style="margin-top: 1rem"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="toolbar">
+            <div class="toolbar__search">
+              <svg
+                class="toolbar__search-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                type="search"
+                class="toolbar__search-input"
+                id="search-shipments"
+                placeholder="Search by tracking #, carrier, order ID…"
+              />
+            </div>
+            <div class="toolbar__sep"></div>
+            <div class="toolbar__filter-group">
+              <span class="toolbar__filter-label">Status:</span>
+              <select class="toolbar__select" id="filter-ship-status">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="picked_up">Picked Up</option>
+                <option value="in_transit">In Transit</option>
+                <option value="out_for_delivery">Out for Delivery</option>
+                <option value="delivered">Delivered</option>
+                <option value="exception">Exception</option>
+                <option value="returned">Returned</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div id="shipments-table-container">
+            <div
+              class="skeleton"
+              style="height: 400px; border-radius: 14px"
+            ></div>
+          </div>
+
+          <!-- Pagination -->
+          <div id="shipments-pagination"></div>
+        </main>
+      </div>
+    </div>
+
+    <!-- ===================================================
+       SHIPMENT STATUS UPDATE MODAL
+       =================================================== -->
+    <div class="modal-backdrop" id="shipment-status-modal">
+      <div class="modal">
+        <div class="modal__header">
+          <div class="modal__title">
+            Update Shipment
+            <span
+              class="font-normal text-muted"
+              style="font-size: 0.875rem"
+              id="ship-modal-id"
+            ></span>
+          </div>
+          <button class="modal__close" id="ship-modal-cancel">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label">Current Status</label>
+            <div id="ship-modal-current" style="margin-top: 0.25rem"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">New Status</label>
+            <select class="form-select" id="ship-modal-status"></select>
           </div>
         </div>
+        <div class="modal__footer">
+          <button
+            class="btn btn--secondary"
+            id="ship-modal-cancel-footer"
+            onclick="
+              document
+                .getElementById('shipment-status-modal')
+                .classList.remove('active')
+            "
+          >
+            Cancel
+          </button>
+          <button class="btn btn--primary" id="ship-modal-confirm">Save</button>
+        </div>
+      </div>
+    </div>
 
-        <!-- Toolbar -->
-        <div class="toolbar">
-          <div class="toolbar__search">
-            <svg class="toolbar__search-icon" xmlns="http://www.w3.org/2000/svg" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    <!-- Create Shipment Modal -->
+    <div class="modal-backdrop" id="create-shipment-modal">
+      <div class="modal">
+        <div class="modal__header">
+          <div class="modal__title">Create Shipment</div>
+          <button class="modal__close" id="create-shipment-cancel">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
-            <input type="search" class="toolbar__search-input"
-              id="search-shipments" placeholder="Search by tracking #, carrier, order ID…"/>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label required">Order ID</label
+            ><input
+              class="form-input"
+              id="shipment-order-id"
+              placeholder="Order UUID"
+            />
           </div>
-          <div class="toolbar__sep"></div>
-          <div class="toolbar__filter-group">
-            <span class="toolbar__filter-label">Status:</span>
-            <select class="toolbar__select" id="filter-ship-status">
-              <option value="">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="picked">Picked</option>
-              <option value="packed">Packed</option>
-              <option value="shipped">Shipped</option>
-              <option value="delivered">Delivered</option>
-              <option value="delayed">Delayed</option>
-              <option value="returned">Returned</option>
-              <option value="cancelled">Cancelled</option>
+          <div class="form-group">
+            <label class="form-label">Carrier</label
+            ><select class="form-select" id="shipment-carrier">
+              <option value="">Select carrier</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Service Type</label
+            ><input
+              class="form-input"
+              id="shipment-service"
+              placeholder="e.g. standard, express"
+            />
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" id="create-shipment-cancel-footer">
+            Cancel
+          </button>
+          <button class="btn btn--primary" id="create-shipment-submit">
+            Create Shipment
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Carrier Modal -->
+    <div class="modal-backdrop" id="create-carrier-modal">
+      <div class="modal">
+        <div class="modal__header">
+          <div class="modal__title">Create Carrier</div>
+          <button class="modal__close" id="create-carrier-cancel">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label required">Carrier Name</label
+            ><input class="form-input" id="carrier-name" placeholder="FedEx" />
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Code</label
+            ><input class="form-input" id="carrier-code" placeholder="FEDEX" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type</label
+            ><select class="form-select" id="carrier-type">
+              <option value="standard">Standard</option>
+              <option value="express">Express</option>
+              <option value="freight">Freight</option>
+              <option value="last_mile">Last Mile</option>
             </select>
           </div>
         </div>
-
-        <!-- Table -->
-        <div id="shipments-table-container">
-          <div class="skeleton" style="height:400px;border-radius:14px"></div>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" id="create-carrier-cancel-footer">
+            Cancel
+          </button>
+          <button class="btn btn--primary" id="create-carrier-submit">
+            Create Carrier
+          </button>
         </div>
-
-        <!-- Pagination -->
-        <div id="shipments-pagination"></div>
-
-      </main>
-    </div>
-  </div>
-
-  <!-- ===================================================
-       SHIPMENT STATUS UPDATE MODAL
-       =================================================== -->
-  <div class="modal-backdrop" id="shipment-status-modal">
-    <div class="modal">
-      <div class="modal__header">
-        <div class="modal__title">
-          Update Shipment
-          <span class="font-normal text-muted" style="font-size:.875rem" id="ship-modal-id"></span>
-        </div>
-        <button class="modal__close" id="ship-modal-cancel">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-      <div class="modal__body">
-        <div class="form-group">
-          <label class="form-label">Current Status</label>
-          <div id="ship-modal-current" style="margin-top:.25rem"></div>
-        </div>
-        <div class="form-group">
-          <label class="form-label required">New Status</label>
-          <select class="form-select" id="ship-modal-status"></select>
-        </div>
-      </div>
-      <div class="modal__footer">
-        <button class="btn btn--secondary" id="ship-modal-cancel-footer"
-          onclick="document.getElementById('shipment-status-modal').classList.remove('active')">
-          Cancel
-        </button>
-        <button class="btn btn--primary" id="ship-modal-confirm">Save</button>
       </div>
     </div>
-  </div>
 
-  <div id="toast-container" class="toast-container"></div>
-  <script type="module" src="../js/shipments.js"></script>
-</body>
+    <div id="toast-container" class="toast-container"></div>
+    <script type="module" src="../js/shipments.js"></script>
+  </body>
 </html>

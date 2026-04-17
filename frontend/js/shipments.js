@@ -5,52 +5,75 @@
  * Auto-polls every 10 seconds.
  */
 
-import { Shipments } from './api.js';
+import { Shipments, Orders, Warehouses } from "./api.js";
 import {
-  initShell, markSyncing,
-  formatDate, formatDateTime, formatNumber,
+  initShell,
+  markSyncing,
+  formatDate,
+  formatDateTime,
+  formatNumber,
   statusBadge,
-  showPageLoader, showError, showEmpty,
-  escapeHtml, toast,
-  sortBy, debounce, paginate, renderPagination,
+  showPageLoader,
+  showError,
+  showEmpty,
+  escapeHtml,
+  toast,
+  sortBy,
+  debounce,
+  paginate,
+  renderPagination,
   startPolling,
-} from './utils.js';
+} from "./utils.js";
 
 /* ============================================================
    STATE
    ============================================================ */
 const state = {
   shipments: [],
-  filtered:  [],
-  carriers:  {},          // carrier_id → { name, code, carrier_type }
-  sortKey:   'created_at',
-  sortDir:   'desc',
-  page:      1,
-  perPage:   20,
+  filtered: [],
+  carriers: {}, // carrier_id → { name, code, carrier_type }
+  sortKey: "created_at",
+  sortDir: "desc",
+  page: 1,
+  perPage: 20,
   filters: {
-    search:   '',
-    status:   '',
+    search: "",
+    status: "",
   },
   tracking: null,
 };
 
-const SHIPMENT_STATUSES = ['pending', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'exception', 'returned'];
+const SHIPMENT_STATUSES = [
+  "pending",
+  "picked_up",
+  "in_transit",
+  "out_for_delivery",
+  "delivered",
+  "exception",
+  "returned",
+];
 
 /* ============================================================
    INIT
    ============================================================ */
-document.addEventListener('DOMContentLoaded', async () => {
-  await initShell('shipments', 'Shipments');
+document.addEventListener("DOMContentLoaded", async () => {
+  await initShell("shipments", "Shipments");
   await loadCarriers();
   await loadShipments();
 
   bindFilterControls();
   bindTrackingPanel();
+  bindCreateShipmentModal();
+  bindCreateCarrierModal();
 
-  startPolling('shipments', async () => {
-    markSyncing();
-    await loadShipments(true);
-  }, 10000);
+  startPolling(
+    "shipments",
+    async () => {
+      markSyncing();
+      await loadShipments(true);
+    },
+    10000,
+  );
 });
 
 /* ============================================================
@@ -61,22 +84,30 @@ async function loadCarriers() {
     const data = await Shipments.getCarriers();
     const list = Array.isArray(data) ? data : [];
     for (const c of list) {
-      state.carriers[c.id] = { name: c.name, code: c.code, carrier_type: c.carrier_type };
+      state.carriers[c.id] = {
+        name: c.name,
+        code: c.code,
+        carrier_type: c.carrier_type,
+      };
     }
-  } catch (_) { /* carriers are optional for display */ }
+  } catch (_) {
+    /* carriers are optional for display */
+  }
 }
 
 /* ============================================================
    LOAD DATA
    ============================================================ */
 async function loadShipments(silent = false) {
-  if (!silent) showPageLoader('shipments-table-container');
+  if (!silent) showPageLoader("shipments-table-container");
 
   try {
     const data = await Shipments.getAll();
-    state.shipments = Array.isArray(data) ? data : (data?.items ?? data?.shipments ?? []);
+    state.shipments = Array.isArray(data)
+      ? data
+      : (data?.items ?? data?.shipments ?? []);
   } catch (err) {
-    if (!silent) toast(`Failed to load shipments: ${err.message}`, 'error');
+    if (!silent) toast(`Failed to load shipments: ${err.message}`, "error");
     state.shipments = [];
   } finally {
     applyFilters();
@@ -90,17 +121,20 @@ function applyFilters() {
   const { search, status } = state.filters;
   const term = search.toLowerCase();
 
-  state.filtered = state.shipments.filter(s => {
-    const tracking    = (s.tracking_number ?? '').toLowerCase();
-    const carrierName = (state.carriers[s.carrier_id]?.name ?? '').toLowerCase();
-    const orderId     = String(s.order_id ?? '').toLowerCase();
+  state.filtered = state.shipments.filter((s) => {
+    const tracking = (s.tracking_number ?? "").toLowerCase();
+    const carrierName = (
+      state.carriers[s.carrier_id]?.name ?? ""
+    ).toLowerCase();
+    const orderId = String(s.order_id ?? "").toLowerCase();
 
-    const matchSearch = !term
-      || tracking.includes(term)
-      || carrierName.includes(term)
-      || orderId.includes(term);
+    const matchSearch =
+      !term ||
+      tracking.includes(term) ||
+      carrierName.includes(term) ||
+      orderId.includes(term);
 
-    const matchStatus = !status || (s.status ?? '').toLowerCase() === status;
+    const matchStatus = !status || (s.status ?? "").toLowerCase() === status;
     return matchSearch && matchStatus;
   });
 
@@ -111,35 +145,49 @@ function applyFilters() {
 }
 
 function renderShipmentKPIs() {
-  const total    = state.shipments.length;
-  const inTransit= state.shipments.filter(s => s.status === 'in_transit').length;
-  const delayed  = state.shipments.filter(s => s.status === 'exception').length;
-  const delivered= state.shipments.filter(s => s.status === 'delivered').length;
+  const total = state.shipments.length;
+  const inTransit = state.shipments.filter(
+    (s) => s.status === "in_transit",
+  ).length;
+  const delayed = state.shipments.filter(
+    (s) => s.status === "exception",
+  ).length;
+  const delivered = state.shipments.filter(
+    (s) => s.status === "delivered",
+  ).length;
 
   const setStat = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   };
-  setStat('stat-total-shipments',  total);
-  setStat('stat-in-transit',       inTransit);
-  setStat('stat-delayed',          delayed);
-  setStat('stat-delivered',        delivered);
+  setStat("stat-total-shipments", total);
+  setStat("stat-in-transit", inTransit);
+  setStat("stat-delayed", delayed);
+  setStat("stat-delivered", delivered);
 }
 
 /* ============================================================
    RENDER TABLE
    ============================================================ */
 function renderTable() {
-  const container = document.getElementById('shipments-table-container');
+  const container = document.getElementById("shipments-table-container");
   if (!container) return;
 
   if (state.filtered.length === 0) {
-    showEmpty('shipments-table-container', 'No shipments found', 'Try adjusting your filters.');
-    document.getElementById('shipments-pagination')?.replaceChildren();
+    showEmpty(
+      "shipments-table-container",
+      "No shipments found",
+      "Try adjusting your filters.",
+    );
+    document.getElementById("shipments-pagination")?.replaceChildren();
     return;
   }
 
-  const { items, ...pagination } = paginate(state.filtered, state.page, state.perPage);
+  const { items, ...pagination } = paginate(
+    state.filtered,
+    state.page,
+    state.perPage,
+  );
 
   container.innerHTML = `
     <div class="table-wrapper">
@@ -149,73 +197,79 @@ function renderTable() {
             <th>Tracking #</th>
             <th>Order ID</th>
             <th>Carrier</th>
-            <th class="sortable ${state.sortKey === 'status' ? 'sorted' : ''}" data-key="status"
-              style="cursor:pointer">Status ${state.sortKey === 'status' ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕'}</th>
+            <th class="sortable ${state.sortKey === "status" ? "sorted" : ""}" data-key="status"
+              style="cursor:pointer">Status ${state.sortKey === "status" ? (state.sortDir === "asc" ? "↑" : "↓") : "↕"}</th>
             <th>Est. Delivery</th>
-            <th class="sortable ${state.sortKey === 'created_at' ? 'sorted' : ''}" data-key="created_at"
-              style="cursor:pointer">Shipped On ${state.sortKey === 'created_at' ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕'}</th>
+            <th class="sortable ${state.sortKey === "created_at" ? "sorted" : ""}" data-key="created_at"
+              style="cursor:pointer">Shipped On ${state.sortKey === "created_at" ? (state.sortDir === "asc" ? "↑" : "↓") : "↕"}</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${items.map(s => shipmentRowHTML(s)).join('')}
+          ${items.map((s) => shipmentRowHTML(s)).join("")}
         </tbody>
       </table>
     </div>`;
 
   // Sort
-  container.querySelectorAll('th.sortable').forEach(th => {
-    th.addEventListener('click', () => {
+  container.querySelectorAll("th.sortable").forEach((th) => {
+    th.addEventListener("click", () => {
       const key = th.dataset.key;
-      if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
-      else { state.sortKey = key; state.sortDir = 'asc'; }
+      if (state.sortKey === key)
+        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+      else {
+        state.sortKey = key;
+        state.sortDir = "asc";
+      }
       applyFilters();
     });
   });
 
   // Track button
-  container.querySelectorAll('.btn-track').forEach(btn => {
-    btn.addEventListener('click', () => trackShipment(btn.dataset.tracking));
+  container.querySelectorAll(".btn-track").forEach((btn) => {
+    btn.addEventListener("click", () => trackShipment(btn.dataset.tracking));
   });
 
   // Update status
-  container.querySelectorAll('.btn-update-shipment').forEach(btn => {
-    btn.addEventListener('click', () => openStatusModal(btn.dataset.id, btn.dataset.status));
+  container.querySelectorAll(".btn-update-shipment").forEach((btn) => {
+    btn.addEventListener("click", () =>
+      openStatusModal(btn.dataset.id, btn.dataset.status),
+    );
   });
 
-  renderPagination('shipments-pagination', pagination, p => {
+  renderPagination("shipments-pagination", pagination, (p) => {
     state.page = p;
     renderTable();
   });
 }
 
 function shipmentRowHTML(s) {
-  const tracking    = s.tracking_number ?? '—';
-  const orderId     = s.order_id ?? '—';
+  const tracking = s.tracking_number ?? "—";
+  const orderId = s.order_id ?? "—";
   const carrierInfo = state.carriers[s.carrier_id];
-  const carrierName = carrierInfo?.name ?? '—';
-  const carrierType = carrierInfo?.carrier_type ?? '';
-  const status      = s.status ?? 'pending';
+  const carrierName = carrierInfo?.name ?? "—";
+  const carrierType = carrierInfo?.carrier_type ?? "";
+  const status = s.status ?? "pending";
   const estDelivery = s.estimated_delivery;
-  const shippedOn   = s.shipped_at ?? s.created_at;
-  const isDelayed   = status === 'exception';
+  const shippedOn = s.shipped_at ?? s.created_at;
+  const isDelayed = status === "exception";
 
   return `
-    <tr style="${isDelayed ? 'background:var(--clr-danger-light)' : ''}">
+    <tr style="${isDelayed ? "background:var(--clr-danger-light)" : ""}">
       <td>
         <div style="display:flex;align-items:center;gap:.5rem">
           <span class="table__id">${escapeHtml(tracking)}</span>
-          ${isDelayed ? `<span class="badge badge--critical badge--dot" style="font-size:.625rem">Exception</span>` : ''}
+          ${isDelayed ? `<span class="badge badge--critical badge--dot" style="font-size:.625rem">Exception</span>` : ""}
         </div>
       </td>
       <td><span class="table__id">${escapeHtml(String(orderId).slice(0, 8))}…</span></td>
       <td>
         <div style="font-weight:500">${escapeHtml(carrierName)}</div>
-        ${carrierType ? `<div class="text-xs text-muted">${escapeHtml(carrierType)}</div>` : ''}
+        ${carrierType ? `<div class="text-xs text-muted">${escapeHtml(carrierType)}</div>` : ""}
       </td>
       <td>${statusBadge(status)}</td>
-      <td class="${isDelayed ? 'text-danger font-semibold' : 'text-muted'}">
-        ${estDelivery ? formatDate(estDelivery) : '—'}
+      <td class="${isDelayed ? "text-danger font-semibold" : "text-muted"}">
+        ${estDelivery ? formatDate(estDelivery) : "—"}
       </td>
       <td class="text-muted">${formatDate(shippedOn)}</td>
       <td>
@@ -231,7 +285,7 @@ function shipmentRowHTML(s) {
             Track
           </button>
           <button class="btn btn--ghost btn--sm btn-update-shipment"
-            data-id="${escapeHtml(String(s.id ?? s.shipment_id ?? ''))}"
+            data-id="${escapeHtml(String(s.id ?? s.shipment_id ?? ""))}"
             data-status="${escapeHtml(status)}"
             title="Update status">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -249,15 +303,15 @@ function shipmentRowHTML(s) {
    TRACKING PANEL
    ============================================================ */
 function bindTrackingPanel() {
-  const input = document.getElementById('tracking-input');
-  const btn   = document.getElementById('track-btn');
-  const panel = document.getElementById('tracking-result');
+  const input = document.getElementById("tracking-input");
+  const btn = document.getElementById("track-btn");
+  const panel = document.getElementById("tracking-result");
 
   if (btn) {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener("click", async () => {
       const num = input?.value?.trim();
       if (!num) {
-        toast('Enter a tracking number', 'warning');
+        toast("Enter a tracking number", "warning");
         return;
       }
       await trackShipment(num);
@@ -265,8 +319,8 @@ function bindTrackingPanel() {
   }
 
   if (input) {
-    input.addEventListener('keydown', async e => {
-      if (e.key === 'Enter') {
+    input.addEventListener("keydown", async (e) => {
+      if (e.key === "Enter") {
         const num = input.value?.trim();
         if (num) await trackShipment(num);
       }
@@ -275,16 +329,17 @@ function bindTrackingPanel() {
 }
 
 async function trackShipment(trackingNumber) {
-  if (!trackingNumber || trackingNumber === '—') return;
+  if (!trackingNumber || trackingNumber === "—") return;
 
-  const panel  = document.getElementById('tracking-result');
-  const input  = document.getElementById('tracking-input');
+  const panel = document.getElementById("tracking-result");
+  const input = document.getElementById("tracking-input");
 
   if (input && !input.value) input.value = trackingNumber;
   if (!panel) return;
 
-  panel.innerHTML = '<div class="page-loading"><div class="spinner"></div><span>Fetching tracking info…</span></div>';
-  panel.classList.remove('hidden');
+  panel.innerHTML =
+    '<div class="page-loading"><div class="spinner"></div><span>Fetching tracking info…</span></div>';
+  panel.classList.remove("hidden");
 
   try {
     const data = await Shipments.track(trackingNumber);
@@ -303,15 +358,16 @@ async function trackShipment(trackingNumber) {
 
 function renderTrackingResult(container, data) {
   if (!data) {
-    container.innerHTML = '<div class="empty-state__title">No tracking data found</div>';
+    container.innerHTML =
+      '<div class="empty-state__title">No tracking data found</div>';
     return;
   }
 
-  const tracking    = data.tracking_number ?? '—';
+  const tracking = data.tracking_number ?? "—";
   const carrierInfo = state.carriers[data.carrier_id];
-  const carrierName = carrierInfo?.name ?? '—';
-  const status      = data.status ?? 'unknown';
-  const events      = data.events ?? [];
+  const carrierName = carrierInfo?.name ?? "—";
+  const status = data.status ?? "unknown";
+  const events = data.events ?? [];
 
   container.innerHTML = `
     <div class="card">
@@ -326,7 +382,10 @@ function renderTrackingResult(container, data) {
         </div>
       </div>
       <div class="card__body">
-        ${events.length > 0 ? timelineHTML(events) : `
+        ${
+          events.length > 0
+            ? timelineHTML(events)
+            : `
           <div class="stat-row">
             <span class="stat-row__label">Status</span>
             <span class="stat-row__value">${statusBadge(status)}</span>
@@ -341,45 +400,50 @@ function renderTrackingResult(container, data) {
           </div>
           <div class="stat-row">
             <span class="stat-row__label">Weight</span>
-            <span class="stat-row__value">${data.weight_kg ? data.weight_kg + ' kg' : '—'}</span>
+            <span class="stat-row__value">${data.weight_kg ? data.weight_kg + " kg" : "—"}</span>
           </div>
           <div class="stat-row">
             <span class="stat-row__label">Cost</span>
-            <span class="stat-row__value">${data.cost ? '$' + formatNumber(data.cost, 2) : '—'}</span>
-          </div>`}
+            <span class="stat-row__value">${data.cost ? "$" + formatNumber(data.cost, 2) : "—"}</span>
+          </div>`
+        }
       </div>
     </div>`;
 
-  container.querySelector('#close-tracking')?.addEventListener('click', () => {
-    container.innerHTML = '';
-    container.classList.add('hidden');
-    const input = document.getElementById('tracking-input');
-    if (input) input.value = '';
+  container.querySelector("#close-tracking")?.addEventListener("click", () => {
+    container.innerHTML = "";
+    container.classList.add("hidden");
+    const input = document.getElementById("tracking-input");
+    if (input) input.value = "";
   });
 }
 
 function timelineHTML(events) {
   return `
     <div class="timeline">
-      ${events.map((ev, idx) => {
-        const isFirst = idx === 0;
-        const status  = ev.status ?? ev.event ?? 'update';
-        const time    = ev.timestamp ?? ev.date ?? ev.time;
-        const location= ev.location ?? ev.city ?? '';
-        return `
+      ${events
+        .map((ev, idx) => {
+          const isFirst = idx === 0;
+          const status = ev.status ?? ev.event ?? "update";
+          const time = ev.timestamp ?? ev.date ?? ev.time;
+          const location = ev.location ?? ev.city ?? "";
+          return `
           <div class="timeline__item">
-            <div class="timeline__dot ${isFirst ? 'current' : 'completed'}">
-              ${isFirst
-                ? `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="timeline__dot ${isFirst ? "current" : "completed"}">
+              ${
+                isFirst
+                  ? `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 12l2 2 4-4"/>
                    </svg>`
-                : ''}
+                  : ""
+              }
             </div>
-            <div class="timeline__title">${escapeHtml(String(status).replace(/_/g, ' '))}</div>
-            ${location ? `<div class="timeline__time">${escapeHtml(location)}</div>` : ''}
+            <div class="timeline__title">${escapeHtml(String(status).replace(/_/g, " "))}</div>
+            ${location ? `<div class="timeline__time">${escapeHtml(location)}</div>` : ""}
             <div class="timeline__time">${formatDateTime(time)}</div>
           </div>`;
-      }).join('')}
+        })
+        .join("")}
     </div>`;
 }
 
@@ -390,58 +454,69 @@ let _currentShipmentId = null;
 
 function openStatusModal(shipmentId, currentStatus) {
   _currentShipmentId = shipmentId;
-  const modal   = document.getElementById('shipment-status-modal');
-  const idEl    = document.getElementById('ship-modal-id');
-  const curEl   = document.getElementById('ship-modal-current');
-  const select  = document.getElementById('ship-modal-status');
+  const modal = document.getElementById("shipment-status-modal");
+  const idEl = document.getElementById("ship-modal-id");
+  const curEl = document.getElementById("ship-modal-current");
+  const select = document.getElementById("ship-modal-status");
 
-  if (idEl)   idEl.textContent  = `#${shipmentId}`;
-  if (curEl)  curEl.innerHTML   = statusBadge(currentStatus);
+  if (idEl) idEl.textContent = `#${shipmentId}`;
+  if (curEl) curEl.innerHTML = statusBadge(currentStatus);
   if (select) {
-    select.innerHTML = SHIPMENT_STATUSES.map(s =>
-      `<option value="${s}" ${s === currentStatus ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
-    ).join('');
+    select.innerHTML = SHIPMENT_STATUSES.map(
+      (s) =>
+        `<option value="${s}" ${s === currentStatus ? "selected" : ""}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`,
+    ).join("");
   }
-  modal?.classList.add('active');
+  modal?.classList.add("active");
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('ship-modal-cancel')?.addEventListener('click', closeShipmentModal);
-  document.getElementById('shipment-status-modal')?.addEventListener('click', e => {
-    if (e.target === e.currentTarget) closeShipmentModal();
-  });
+document.addEventListener("DOMContentLoaded", () => {
+  document
+    .getElementById("ship-modal-cancel")
+    ?.addEventListener("click", closeShipmentModal);
+  document
+    .getElementById("shipment-status-modal")
+    ?.addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeShipmentModal();
+    });
 
-  document.getElementById('ship-modal-confirm')?.addEventListener('click', async () => {
-    const select    = document.getElementById('ship-modal-status');
-    const newStatus = select?.value;
-    if (!newStatus || !_currentShipmentId) return;
+  document
+    .getElementById("ship-modal-confirm")
+    ?.addEventListener("click", async () => {
+      const select = document.getElementById("ship-modal-status");
+      const newStatus = select?.value;
+      if (!newStatus || !_currentShipmentId) return;
 
-    const btn = document.getElementById('ship-modal-confirm');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner spinner--sm spinner--white"></div> Saving…';
+      const btn = document.getElementById("ship-modal-confirm");
+      btn.disabled = true;
+      btn.innerHTML =
+        '<div class="spinner spinner--sm spinner--white"></div> Saving…';
 
-    try {
-      await Shipments.updateStatus(_currentShipmentId, newStatus);
+      try {
+        await Shipments.updateStatus(_currentShipmentId, { status: newStatus });
 
-      const shipment = state.shipments.find(
-        s => String(s.id) === String(_currentShipmentId)
-      );
-      if (shipment) shipment.status = newStatus;
+        const shipment = state.shipments.find(
+          (s) => String(s.id) === String(_currentShipmentId),
+        );
+        if (shipment) shipment.status = newStatus;
 
-      toast(`Shipment #${_currentShipmentId} updated to "${newStatus}"`, 'success');
-      closeShipmentModal();
-      applyFilters();
-    } catch (err) {
-      toast(`Failed to update: ${err.message}`, 'error');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = 'Save';
-    }
-  });
+        toast(
+          `Shipment #${_currentShipmentId} updated to "${newStatus}"`,
+          "success",
+        );
+        closeShipmentModal();
+        applyFilters();
+      } catch (err) {
+        toast(`Failed to update: ${err.message}`, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "Save";
+      }
+    });
 });
 
 function closeShipmentModal() {
-  document.getElementById('shipment-status-modal')?.classList.remove('active');
+  document.getElementById("shipment-status-modal")?.classList.remove("active");
   _currentShipmentId = null;
 }
 
@@ -449,20 +524,151 @@ function closeShipmentModal() {
    FILTER CONTROLS
    ============================================================ */
 function bindFilterControls() {
-  const search = document.getElementById('search-shipments');
-  const status = document.getElementById('filter-ship-status');
+  const search = document.getElementById("search-shipments");
+  const status = document.getElementById("filter-ship-status");
 
   if (search) {
-    search.addEventListener('input', debounce(e => {
-      state.filters.search = e.target.value;
-      applyFilters();
-    }, 300));
+    search.addEventListener(
+      "input",
+      debounce((e) => {
+        state.filters.search = e.target.value;
+        applyFilters();
+      }, 300),
+    );
   }
 
   if (status) {
-    status.addEventListener('change', e => {
+    status.addEventListener("change", (e) => {
       state.filters.status = e.target.value;
       applyFilters();
     });
   }
+}
+
+/* ============================================================
+   CREATE SHIPMENT MODAL
+   ============================================================ */
+function bindCreateShipmentModal() {
+  const openBtn = document.getElementById("create-shipment-btn");
+  const modal = document.getElementById("create-shipment-modal");
+  if (!openBtn || !modal) return;
+
+  const closeModal = () => modal.classList.remove("active");
+  openBtn.addEventListener("click", async () => {
+    // Populate carrier select
+    const sel = document.getElementById("shipment-carrier");
+    if (sel) {
+      sel.innerHTML =
+        '<option value="">Select carrier</option>' +
+        Object.entries(state.carriers)
+          .map(
+            ([id, c]) =>
+              `<option value="${id}">${escapeHtml(c.name || c.code || id)}</option>`,
+          )
+          .join("");
+    }
+    modal.classList.add("active");
+  });
+
+  document
+    .getElementById("create-shipment-cancel")
+    ?.addEventListener("click", closeModal);
+  document
+    .getElementById("create-shipment-cancel-footer")
+    ?.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  document
+    .getElementById("create-shipment-submit")
+    ?.addEventListener("click", async () => {
+      const orderId = document
+        .getElementById("shipment-order-id")
+        ?.value?.trim();
+      const carrierId = document.getElementById("shipment-carrier")?.value;
+      const serviceType = document
+        .getElementById("shipment-service")
+        ?.value?.trim();
+
+      if (!orderId) {
+        toast("Order ID is required", "warning");
+        return;
+      }
+
+      const submitBtn = document.getElementById("create-shipment-submit");
+      submitBtn.disabled = true;
+      submitBtn.innerHTML =
+        '<div class="spinner spinner--sm spinner--white"></div>';
+
+      try {
+        const body = {
+          order_id: orderId,
+          ...(carrierId && { carrier_id: carrierId }),
+          ...(serviceType && { service_type: serviceType }),
+        };
+        await Shipments.create(body);
+        toast("Shipment created successfully", "success");
+        closeModal();
+        await loadShipments();
+      } catch (err) {
+        toast(`Failed: ${err.message}`, "error");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create Shipment";
+      }
+    });
+}
+
+/* ============================================================
+   CREATE CARRIER MODAL
+   ============================================================ */
+function bindCreateCarrierModal() {
+  const openBtn = document.getElementById("create-carrier-btn");
+  const modal = document.getElementById("create-carrier-modal");
+  if (!openBtn || !modal) return;
+
+  const closeModal = () => modal.classList.remove("active");
+  openBtn.addEventListener("click", () => modal.classList.add("active"));
+  document
+    .getElementById("create-carrier-cancel")
+    ?.addEventListener("click", closeModal);
+  document
+    .getElementById("create-carrier-cancel-footer")
+    ?.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  document
+    .getElementById("create-carrier-submit")
+    ?.addEventListener("click", async () => {
+      const name = document.getElementById("carrier-name")?.value?.trim();
+      const code = document.getElementById("carrier-code")?.value?.trim();
+      const carrierType = document.getElementById("carrier-type")?.value;
+
+      if (!name || !code) {
+        toast("Name and code are required", "warning");
+        return;
+      }
+
+      const submitBtn = document.getElementById("create-carrier-submit");
+      submitBtn.disabled = true;
+
+      try {
+        await Shipments.createCarrier({
+          name,
+          code,
+          carrier_type: carrierType || "standard",
+        });
+        toast("Carrier created successfully", "success");
+        closeModal();
+        await loadCarriers();
+      } catch (err) {
+        toast(`Failed: ${err.message}`, "error");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create Carrier";
+      }
+    });
 }

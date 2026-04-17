@@ -5,35 +5,47 @@
  * Auto-polls every 10 seconds.
  */
 
-import { Inventory } from './api.js';
+import { Inventory, Warehouses, Products } from "./api.js";
 import {
-  initShell, markSyncing,
-  formatDate, formatNumber,
+  initShell,
+  markSyncing,
+  formatDate,
+  formatDateTime,
+  formatNumber,
   statusBadge,
-  showPageLoader, showError, showEmpty,
-  escapeHtml, toast,
-  sortBy, debounce, paginate, renderPagination,
+  showPageLoader,
+  showError,
+  showEmpty,
+  escapeHtml,
+  toast,
+  sortBy,
+  debounce,
+  paginate,
+  renderPagination,
   startPolling,
-  CHART_COLORS, CHART_PALETTE, chartDefaults,
-} from './utils.js';
+  CHART_COLORS,
+  CHART_PALETTE,
+  chartDefaults,
+} from "./utils.js";
 
 /* ============================================================
    STATE
    ============================================================ */
 const state = {
-  stock:     [],
+  stock: [],
   movements: [],
-  lowStock:  [],
-  filteredStock:     [],
+  lowStock: [],
+  warehouses: [],
+  filteredStock: [],
   filteredMovements: [],
-  activeTab: 'stock',      // 'stock' | 'movements' | 'alerts'
+  activeTab: "stock", // 'stock' | 'movements' | 'alerts'
   stockPage: 1,
-  movPage:   1,
-  perPage:   20,
-  sortKey:   'quantity',
-  sortDir:   'asc',
-  search:    '',
-  warehouseFilter: '',
+  movPage: 1,
+  perPage: 20,
+  sortKey: "quantity",
+  sortDir: "asc",
+  search: "",
+  warehouseFilter: "",
 };
 
 let stockChart = null;
@@ -41,75 +53,129 @@ let stockChart = null;
 /* ============================================================
    INIT
    ============================================================ */
-document.addEventListener('DOMContentLoaded', async () => {
-  await initShell('inventory', 'Inventory');
+document.addEventListener("DOMContentLoaded", async () => {
+  await initShell("inventory", "Inventory");
+  await loadWarehousesForFilter();
   await loadInventory();
 
   bindTabControls();
   bindFilterControls();
+  bindInventoryActions();
 
-  startPolling('inventory', async () => {
-    markSyncing();
-    await loadInventory(true);
-  }, 10000);
+  startPolling(
+    "inventory",
+    async () => {
+      markSyncing();
+      await loadInventory(true);
+    },
+    10000,
+  );
 });
 
 /* ============================================================
    LOAD DATA
    ============================================================ */
+async function loadWarehousesForFilter() {
+  try {
+    const data = await Warehouses.getAll();
+    const list = Array.isArray(data) ? data : [];
+    state.warehouses = list;
+    const sel = document.getElementById("filter-inv-warehouse");
+    if (sel) {
+      list.forEach((wh) => {
+        const opt = document.createElement("option");
+        opt.value = wh.id;
+        opt.textContent = wh.name || `WH ${wh.code}`;
+        sel.appendChild(opt);
+      });
+    }
+    // Also populate modal warehouse selects
+    [
+      "receive-warehouse",
+      "transfer-from-warehouse",
+      "transfer-to-warehouse",
+      "adjust-warehouse",
+    ].forEach((selId) => {
+      const s = document.getElementById(selId);
+      if (s)
+        list.forEach((wh) => {
+          const opt = document.createElement("option");
+          opt.value = wh.id;
+          opt.textContent = wh.name || `WH ${wh.code}`;
+          s.appendChild(opt);
+        });
+    });
+  } catch (_) {
+    state.warehouses = [];
+  }
+}
+
 async function loadInventory(silent = false) {
-  if (!silent) showPageLoader('inventory-content');
+  if (!silent) showPageLoader("inventory-content");
 
   try {
     const [stockRes, movRes, lowRes] = await Promise.allSettled([
-      Inventory.getStockLevels(),
+      Inventory.getAllStock(),
       Inventory.getMovements(),
       Inventory.getBelowReorder(),
     ]);
 
-    if (stockRes.status === 'fulfilled') {
+    if (stockRes.status === "fulfilled") {
       const raw = stockRes.value;
       state.stock = Array.isArray(raw) ? raw : (raw?.items ?? raw?.stock ?? []);
     }
 
-    if (movRes.status === 'fulfilled') {
+    if (movRes.status === "fulfilled") {
       const raw = movRes.value;
-      state.movements = Array.isArray(raw) ? raw : (raw?.items ?? raw?.movements ?? []);
+      state.movements = Array.isArray(raw)
+        ? raw
+        : (raw?.items ?? raw?.movements ?? []);
     }
 
-    if (lowRes.status === 'fulfilled') {
+    if (lowRes.status === "fulfilled") {
       const raw = lowRes.value;
       state.lowStock = Array.isArray(raw) ? raw : (raw?.items ?? []);
     }
 
     populateWarehouseFilter();
     updateAlertBadge();
+    updateSidebarBadge();
     applyStockFilters();
     applyMovementFilters();
     renderActiveTab();
   } catch (err) {
-    showError('inventory-content', `Failed to load inventory: ${err.message}`);
+    showError("inventory-content", `Failed to load inventory: ${err.message}`);
   }
 }
 
 function populateWarehouseFilter() {
-  const sel = document.getElementById('filter-inv-warehouse');
-  if (!sel || sel.dataset.populated === 'true') return;
-  const ids = [...new Set(state.stock.map(i => i.warehouse_id).filter(Boolean))];
-  ids.forEach(id => {
-    const opt = document.createElement('option');
+  const sel = document.getElementById("filter-inv-warehouse");
+  if (!sel || sel.dataset.populated === "true") return;
+  const ids = [
+    ...new Set(state.stock.map((i) => i.warehouse_id).filter(Boolean)),
+  ];
+  ids.forEach((id) => {
+    const opt = document.createElement("option");
     opt.value = id;
     opt.textContent = `WH ${String(id).slice(0, 8)}…`;
     sel.appendChild(opt);
   });
-  if (ids.length) sel.dataset.populated = 'true';
+  if (ids.length) sel.dataset.populated = "true";
 }
 
 function updateAlertBadge() {
-  const badge = document.getElementById('low-stock-badge');
+  const badge = document.getElementById("low-stock-badge");
   if (badge) {
     badge.textContent = state.lowStock.length;
-    badge.style.display = state.lowStock.length ? 'inline-block' : 'none';
+    badge.style.display = state.lowStock.length ? "inline-block" : "none";
+  }
+}
+
+function updateSidebarBadge() {
+  const sidebarBadge = document.getElementById("low-stock-sidebar-badge");
+  if (sidebarBadge) {
+    sidebarBadge.textContent = state.lowStock.length;
+    sidebarBadge.style.display = state.lowStock.length ? "inline-flex" : "none";
   }
 }
 
@@ -117,10 +183,12 @@ function updateAlertBadge() {
    TAB CONTROLS
    ============================================================ */
 function bindTabControls() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document
+        .querySelectorAll(".tab-btn")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
       state.activeTab = btn.dataset.tab;
       renderActiveTab();
     });
@@ -129,9 +197,15 @@ function bindTabControls() {
 
 function renderActiveTab() {
   switch (state.activeTab) {
-    case 'stock':     renderStockTable();      break;
-    case 'movements': renderMovementsTable();   break;
-    case 'alerts':    renderLowStockAlerts();   break;
+    case "stock":
+      renderStockTable();
+      break;
+    case "movements":
+      renderMovementsTable();
+      break;
+    case "alerts":
+      renderLowStockAlerts();
+      break;
   }
 }
 
@@ -139,20 +213,23 @@ function renderActiveTab() {
    FILTER CONTROLS
    ============================================================ */
 function bindFilterControls() {
-  const searchInput = document.getElementById('search-inventory');
-  const warehouseSel = document.getElementById('filter-inv-warehouse');
+  const searchInput = document.getElementById("search-inventory");
+  const warehouseSel = document.getElementById("filter-inv-warehouse");
 
   if (searchInput) {
-    searchInput.addEventListener('input', debounce(e => {
-      state.search = e.target.value.toLowerCase();
-      applyStockFilters();
-      applyMovementFilters();
-      renderActiveTab();
-    }, 300));
+    searchInput.addEventListener(
+      "input",
+      debounce((e) => {
+        state.search = e.target.value.toLowerCase();
+        applyStockFilters();
+        applyMovementFilters();
+        renderActiveTab();
+      }, 300),
+    );
   }
 
   if (warehouseSel) {
-    warehouseSel.addEventListener('change', e => {
+    warehouseSel.addEventListener("change", (e) => {
       state.warehouseFilter = e.target.value;
       applyStockFilters();
       renderActiveTab();
@@ -162,25 +239,35 @@ function bindFilterControls() {
 
 function applyStockFilters() {
   const term = state.search;
-  state.filteredStock = state.stock.filter(item => {
-    const name = (item.product_name ?? '').toLowerCase();
-    const sku  = (item.sku ?? '').toLowerCase();
-    const wh   = String(item.warehouse_id ?? '');
-    const matchSearch    = !term || name.includes(term) || sku.includes(term);
-    const matchWarehouse = !state.warehouseFilter || wh === state.warehouseFilter;
+  state.filteredStock = state.stock.filter((item) => {
+    const name = (item.product_name ?? "").toLowerCase();
+    const sku = (item.sku ?? "").toLowerCase();
+    const wh = String(item.warehouse_id ?? "");
+    const matchSearch = !term || name.includes(term) || sku.includes(term);
+    const matchWarehouse =
+      !state.warehouseFilter || wh === state.warehouseFilter;
     return matchSearch && matchWarehouse;
   });
-  state.filteredStock = sortBy(state.filteredStock, state.sortKey, state.sortDir);
+  state.filteredStock = sortBy(
+    state.filteredStock,
+    state.sortKey,
+    state.sortDir,
+  );
   state.stockPage = 1;
 }
 
 function applyMovementFilters() {
   const term = state.search;
-  state.filteredMovements = state.movements.filter(m => {
-    const pid    = (m.product_id ?? '').toLowerCase();
-    const reason = (m.reason ?? '').toLowerCase();
-    const type   = (m.movement_type ?? '').toLowerCase();
-    return !term || pid.includes(term) || reason.includes(term) || type.includes(term);
+  state.filteredMovements = state.movements.filter((m) => {
+    const pid = (m.product_id ?? "").toLowerCase();
+    const reason = (m.reason ?? "").toLowerCase();
+    const type = (m.movement_type ?? "").toLowerCase();
+    return (
+      !term ||
+      pid.includes(term) ||
+      reason.includes(term) ||
+      type.includes(term)
+    );
   });
   state.movPage = 1;
 }
@@ -189,15 +276,23 @@ function applyMovementFilters() {
    STOCK LEVELS TABLE
    ============================================================ */
 function renderStockTable() {
-  const container = document.getElementById('inventory-content');
+  const container = document.getElementById("inventory-content");
   if (!container) return;
 
   if (state.filteredStock.length === 0) {
-    showEmpty('inventory-content', 'No stock data', 'Inventory data will appear once loaded from the backend.');
+    showEmpty(
+      "inventory-content",
+      "No stock data",
+      "Inventory data will appear once loaded from the backend.",
+    );
     return;
   }
 
-  const { items, ...pagination } = paginate(state.filteredStock, state.stockPage, state.perPage);
+  const { items, ...pagination } = paginate(
+    state.filteredStock,
+    state.stockPage,
+    state.perPage,
+  );
 
   container.innerHTML = `
     <div class="table-wrapper">
@@ -206,9 +301,9 @@ function renderStockTable() {
           <tr>
             <th>SKU / Product</th>
             <th>Warehouse</th>
-            <th class="sortable ${state.sortKey === 'quantity' ? 'sorted' : ''}" data-key="quantity"
+            <th class="sortable ${state.sortKey === "quantity" ? "sorted" : ""}" data-key="quantity"
               style="cursor:pointer">
-              Quantity ${state.sortKey === 'quantity' ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕'}
+              Quantity ${state.sortKey === "quantity" ? (state.sortDir === "asc" ? "↑" : "↓") : "↕"}
             </th>
             <th>Reorder Point</th>
             <th>Status</th>
@@ -217,54 +312,55 @@ function renderStockTable() {
           </tr>
         </thead>
         <tbody>
-          ${items.map(item => stockRowHTML(item)).join('')}
+          ${items.map((item) => stockRowHTML(item)).join("")}
         </tbody>
       </table>
     </div>`;
 
   // Sort header
-  container.querySelectorAll('th.sortable').forEach(th => {
-    th.addEventListener('click', () => {
+  container.querySelectorAll("th.sortable").forEach((th) => {
+    th.addEventListener("click", () => {
       const key = th.dataset.key;
       state.sortKey = key;
-      state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
       applyStockFilters();
       renderStockTable();
     });
   });
 
-  renderPagination('inventory-pagination', pagination, p => {
+  renderPagination("inventory-pagination", pagination, (p) => {
     state.stockPage = p;
     renderStockTable();
   });
 }
 
 function stockRowHTML(item) {
-  const qty       = item.quantity ?? 0;
-  const reserved  = item.reserved_quantity ?? 0;
+  const qty = item.quantity ?? 0;
+  const reserved = item.reserved_quantity ?? 0;
   const available = qty - reserved;
-  const reorder   = item.reorder_point ?? 0;
-  const isLow     = qty <= reorder;
-  const isCritical= qty <= (reorder * 0.5);
+  const reorder = item.reorder_point ?? 0;
+  const isLow = qty <= reorder;
+  const isCritical = qty <= reorder * 0.5;
 
-  const healthPct = reorder > 0 ? Math.min(100, Math.round((qty / (reorder * 3)) * 100)) : 100;
-  const healthColor = isCritical ? 'danger' : isLow ? 'warning' : 'success';
+  const healthPct =
+    reorder > 0 ? Math.min(100, Math.round((qty / (reorder * 3)) * 100)) : 100;
+  const healthColor = isCritical ? "danger" : isLow ? "warning" : "success";
 
-  const badgeType = isCritical ? 'critical' : isLow ? 'warning' : 'success';
-  const badgeLabel = isCritical ? 'Critical' : isLow ? 'Low Stock' : 'In Stock';
+  const badgeType = isCritical ? "critical" : isLow ? "warning" : "success";
+  const badgeLabel = isCritical ? "Critical" : isLow ? "Low Stock" : "In Stock";
 
   return `
-    <tr class="${isCritical ? 'row--highlight' : ''}">
+    <tr class="${isCritical ? "row--highlight" : ""}">
       <td>
-        <div style="font-weight:600">${escapeHtml(item.product_name ?? '—')}</div>
-        <div class="text-xs text-muted font-mono">${escapeHtml(item.sku ?? '—')}</div>
+        <div style="font-weight:600">${escapeHtml(item.product_name ?? "—")}</div>
+        <div class="text-xs text-muted font-mono">${escapeHtml(item.sku ?? "—")}</div>
       </td>
-      <td><span class="tag">${escapeHtml(String(item.warehouse_id ?? '—').slice(0, 8))}…</span></td>
+      <td><span class="tag">${escapeHtml(String(item.warehouse_id ?? "—").slice(0, 8))}…</span></td>
       <td>
-        <span style="font-weight:700;font-size:1rem;color:${isCritical ? 'var(--clr-danger)' : isLow ? 'var(--clr-warning)' : 'var(--clr-text)'}">
+        <span style="font-weight:700;font-size:1rem;color:${isCritical ? "var(--clr-danger)" : isLow ? "var(--clr-warning)" : "var(--clr-text)"}">
           ${formatNumber(qty)}
         </span>
-        ${reserved > 0 ? `<div class="text-xs text-muted">${formatNumber(reserved)} reserved</div>` : ''}
+        ${reserved > 0 ? `<div class="text-xs text-muted">${formatNumber(reserved)} reserved</div>` : ""}
       </td>
       <td class="text-muted">${formatNumber(reorder)}</td>
       <td><span class="badge badge--${badgeType} badge--dot">${badgeLabel}</span></td>
@@ -284,15 +380,23 @@ function stockRowHTML(item) {
    MOVEMENTS TABLE
    ============================================================ */
 function renderMovementsTable() {
-  const container = document.getElementById('inventory-content');
+  const container = document.getElementById("inventory-content");
   if (!container) return;
 
   if (state.filteredMovements.length === 0) {
-    showEmpty('inventory-content', 'No movements recorded', 'Stock movements will appear once inventory is updated.');
+    showEmpty(
+      "inventory-content",
+      "No movements recorded",
+      "Stock movements will appear once inventory is updated.",
+    );
     return;
   }
 
-  const { items, ...pagination } = paginate(state.filteredMovements, state.movPage, state.perPage);
+  const { items, ...pagination } = paginate(
+    state.filteredMovements,
+    state.movPage,
+    state.perPage,
+  );
 
   container.innerHTML = `
     <div class="table-wrapper">
@@ -309,31 +413,35 @@ function renderMovementsTable() {
           </tr>
         </thead>
         <tbody>
-          ${items.map(m => movementRowHTML(m)).join('')}
+          ${items.map((m) => movementRowHTML(m)).join("")}
         </tbody>
       </table>
     </div>`;
 
-  renderPagination('inventory-pagination', pagination, p => {
+  renderPagination("inventory-pagination", pagination, (p) => {
     state.movPage = p;
     renderMovementsTable();
   });
 }
 
 function movementRowHTML(m) {
-  const type     = m.movement_type ?? 'transfer';
-  const qty      = m.quantity ?? 0;
-  const isInbound = type === 'inbound' || type === 'return';
-  const qtyColor  = isInbound ? 'var(--clr-success)' : 'var(--clr-danger)';
-  const qtyPrefix = isInbound ? '+' : '−';
-  const fromWh   = m.from_warehouse_id ? String(m.from_warehouse_id).slice(0, 8) + '…' : '—';
-  const toWh     = m.to_warehouse_id   ? String(m.to_warehouse_id).slice(0, 8) + '…' : '—';
+  const type = m.movement_type ?? "transfer";
+  const qty = m.quantity ?? 0;
+  const isInbound = type === "inbound" || type === "return";
+  const qtyColor = isInbound ? "var(--clr-success)" : "var(--clr-danger)";
+  const qtyPrefix = isInbound ? "+" : "−";
+  const fromWh = m.from_warehouse_id
+    ? String(m.from_warehouse_id).slice(0, 8) + "…"
+    : "—";
+  const toWh = m.to_warehouse_id
+    ? String(m.to_warehouse_id).slice(0, 8) + "…"
+    : "—";
 
   return `
     <tr>
-      <td><span class="table__id">${escapeHtml(String(m.id ?? '—').slice(0, 8))}…</span></td>
+      <td><span class="table__id">${escapeHtml(String(m.id ?? "—").slice(0, 8))}…</span></td>
       <td>
-        <div style="font-weight:500">${escapeHtml(String(m.product_id ?? '—').slice(0, 8))}…</div>
+        <div style="font-weight:500">${escapeHtml(String(m.product_id ?? "—").slice(0, 8))}…</div>
       </td>
       <td>${statusBadge(type)}</td>
       <td>
@@ -343,9 +451,11 @@ function movementRowHTML(m) {
         ${escapeHtml(fromWh)} → ${escapeHtml(toWh)}
       </td>
       <td>
-        ${m.reason
-          ? `<span class="text-sm">${escapeHtml(m.reason)}</span>`
-          : `<span class="text-muted">${escapeHtml(m.reference_type ?? '—')}</span>`}
+        ${
+          m.reason
+            ? `<span class="text-sm">${escapeHtml(m.reason)}</span>`
+            : `<span class="text-muted">${escapeHtml(m.reference_type ?? "—")}</span>`
+        }
       </td>
       <td class="text-muted">${formatDate(m.created_at)}</td>
     </tr>`;
@@ -355,7 +465,7 @@ function movementRowHTML(m) {
    LOW STOCK ALERTS
    ============================================================ */
 function renderLowStockAlerts() {
-  const container = document.getElementById('inventory-content');
+  const container = document.getElementById("inventory-content");
   if (!container) return;
 
   if (state.lowStock.length === 0) {
@@ -384,44 +494,192 @@ function renderLowStockAlerts() {
         </svg>
         <span><strong>${sorted.length} items</strong> are below their reorder threshold and require attention.</span>
       </div>
-      ${sorted.map(item => lowStockCardHTML(item)).join('')}
+      ${sorted.map((item) => lowStockCardHTML(item)).join("")}
     </div>`;
 }
 
 function lowStockCardHTML(item) {
-  const qty      = item.total_quantity ?? 0;
-  const reorder  = item.reorder_point ?? 0;
-  const isCritical = reorder > 0 && qty <= (reorder * 0.5);
-  const deficit  = Math.max(0, reorder - qty);
-  const severity = isCritical ? 'critical' : 'warning';
-  const pct      = reorder > 0 ? Math.round(Math.min(100, (qty / reorder) * 100)) : 0;
+  const qty = item.total_quantity ?? 0;
+  const reorder = item.reorder_point ?? 0;
+  const isCritical = reorder > 0 && qty <= reorder * 0.5;
+  const deficit = Math.max(0, reorder - qty);
+  const severity = isCritical ? "critical" : "warning";
+  const pct =
+    reorder > 0 ? Math.round(Math.min(100, (qty / reorder) * 100)) : 0;
 
   return `
-    <div class="anomaly-card anomaly-card--${isCritical ? 'critical' : 'warning'}">
+    <div class="anomaly-card anomaly-card--${isCritical ? "critical" : "warning"}">
       <div class="anomaly-card__icon"
-        style="background:var(--clr-${isCritical ? 'danger' : 'warning'}-light);color:var(--clr-${isCritical ? 'danger' : 'warning'})">
+        style="background:var(--clr-${isCritical ? "danger" : "warning"}-light);color:var(--clr-${isCritical ? "danger" : "warning"})">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
         </svg>
       </div>
       <div class="anomaly-card__content">
-        <div class="anomaly-card__title">${escapeHtml(item.product_name ?? '—')}</div>
+        <div class="anomaly-card__title">${escapeHtml(item.product_name ?? "—")}</div>
         <div class="anomaly-card__description">
-          Current: <strong style="color:var(--clr-${isCritical ? 'danger' : 'warning'})">${formatNumber(qty)}</strong> units
+          Current: <strong style="color:var(--clr-${isCritical ? "danger" : "warning"})">${formatNumber(qty)}</strong> units
           · Reorder at: <strong>${formatNumber(reorder)}</strong> units
           · Deficit: <strong>${formatNumber(deficit)}</strong> units
         </div>
         <div class="anomaly-card__meta">
-          ${item.warehouse_id ? `<span>WH: ${escapeHtml(String(item.warehouse_id).slice(0, 8))}…</span>` : ''}
-          <span class="badge badge--${severity} badge--dot">${isCritical ? 'Critical' : 'Low Stock'}</span>
+          ${item.warehouse_id ? `<span>WH: ${escapeHtml(String(item.warehouse_id).slice(0, 8))}…</span>` : ""}
+          <span class="badge badge--${severity} badge--dot">${isCritical ? "Critical" : "Low Stock"}</span>
         </div>
       </div>
       <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:.375rem">
         <div style="font-size:0.75rem;color:var(--clr-text-muted)">vs Reorder</div>
-        <div style="font-size:1.25rem;font-weight:800;color:var(--clr-${isCritical ? 'danger' : 'warning'})">
+        <div style="font-size:1.25rem;font-weight:800;color:var(--clr-${isCritical ? "danger" : "warning"})">
           ${pct}%
         </div>
       </div>
     </div>`;
+}
+
+/* ============================================================
+   INVENTORY ACTIONS (Receive, Transfer, Adjust)
+   ============================================================ */
+function bindInventoryActions() {
+  // Receive Stock
+  bindModalAction(
+    "receive-stock-btn",
+    "receive-stock-modal",
+    "receive-stock-cancel",
+    "receive-stock-cancel-footer",
+    "receive-stock-submit",
+    async () => {
+      const productId = document
+        .getElementById("receive-product")
+        ?.value?.trim();
+      const warehouseId = document.getElementById("receive-warehouse")?.value;
+      const qty = parseInt(
+        document.getElementById("receive-quantity")?.value,
+        10,
+      );
+      if (!productId || !warehouseId || !qty) {
+        toast("All fields are required", "warning");
+        return false;
+      }
+      await Inventory.receiveStock({
+        product_id: productId,
+        warehouse_id: warehouseId,
+        quantity: qty,
+      });
+      toast("Stock received successfully", "success");
+      return true;
+    },
+  );
+
+  // Transfer Stock
+  bindModalAction(
+    "transfer-stock-btn",
+    "transfer-stock-modal",
+    "transfer-stock-cancel",
+    "transfer-stock-cancel-footer",
+    "transfer-stock-submit",
+    async () => {
+      const productId = document
+        .getElementById("transfer-product")
+        ?.value?.trim();
+      const fromWh = document.getElementById("transfer-from-warehouse")?.value;
+      const toWh = document.getElementById("transfer-to-warehouse")?.value;
+      const qty = parseInt(
+        document.getElementById("transfer-quantity")?.value,
+        10,
+      );
+      if (!productId || !fromWh || !toWh || !qty) {
+        toast("All fields are required", "warning");
+        return false;
+      }
+      if (fromWh === toWh) {
+        toast("Source and destination must differ", "warning");
+        return false;
+      }
+      await Inventory.transferStock({
+        product_id: productId,
+        from_warehouse_id: fromWh,
+        to_warehouse_id: toWh,
+        quantity: qty,
+      });
+      toast("Stock transferred successfully", "success");
+      return true;
+    },
+  );
+
+  // Adjust Stock
+  bindModalAction(
+    "adjust-stock-btn",
+    "adjust-stock-modal",
+    "adjust-stock-cancel",
+    "adjust-stock-cancel-footer",
+    "adjust-stock-submit",
+    async () => {
+      const productId = document
+        .getElementById("adjust-product")
+        ?.value?.trim();
+      const warehouseId = document.getElementById("adjust-warehouse")?.value;
+      const qty = parseInt(
+        document.getElementById("adjust-quantity")?.value,
+        10,
+      );
+      const reason = document.getElementById("adjust-reason")?.value?.trim();
+      if (!productId || !warehouseId || isNaN(qty)) {
+        toast("All fields are required", "warning");
+        return false;
+      }
+      await Inventory.adjustStock({
+        product_id: productId,
+        warehouse_id: warehouseId,
+        quantity_change: qty,
+        reason: reason || "manual_adjustment",
+      });
+      toast("Stock adjusted successfully", "success");
+      return true;
+    },
+  );
+}
+
+function bindModalAction(
+  openBtnId,
+  modalId,
+  cancelBtnId,
+  cancelFooterId,
+  submitBtnId,
+  onSubmit,
+) {
+  const openBtn = document.getElementById(openBtnId);
+  const modal = document.getElementById(modalId);
+  const cancelBtn = document.getElementById(cancelBtnId);
+  const cancelFooter = document.getElementById(cancelFooterId);
+  const submitBtn = document.getElementById(submitBtnId);
+
+  if (!openBtn || !modal) return;
+
+  const closeModal = () => modal.classList.remove("active");
+  openBtn.addEventListener("click", () => modal.classList.add("active"));
+  cancelBtn?.addEventListener("click", closeModal);
+  cancelFooter?.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  submitBtn?.addEventListener("click", async () => {
+    submitBtn.disabled = true;
+    const origText = submitBtn.textContent;
+    submitBtn.innerHTML =
+      '<div class="spinner spinner--sm spinner--white"></div>';
+    try {
+      const success = await onSubmit();
+      if (success !== false) {
+        closeModal();
+        await loadInventory();
+      }
+    } catch (err) {
+      toast(`Error: ${err.message}`, "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = origText;
+    }
+  });
 }

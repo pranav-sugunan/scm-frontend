@@ -4,43 +4,59 @@
  * charts by product, derived insights, auto-detect.
  */
 
-import { Analytics } from './api.js';
+import { Analytics, Forecasts, Products, Warehouses } from "./api.js";
 import {
-  initShell, markSyncing,
-  formatDate, formatNumber, formatPercent,
+  initShell,
+  markSyncing,
+  formatDate,
+  formatNumber,
+  formatPercent,
   statusBadge,
-  showPageLoader, showError, showEmpty,
-  escapeHtml, toast,
-  debounce, startPolling,
-  CHART_COLORS, CHART_PALETTE, chartDefaults,
-} from './utils.js';
+  showPageLoader,
+  showError,
+  showEmpty,
+  escapeHtml,
+  toast,
+  debounce,
+  startPolling,
+  CHART_COLORS,
+  CHART_PALETTE,
+  chartDefaults,
+} from "./utils.js";
 
 /* ============================================================
    STATE
    ============================================================ */
 const state = {
-  anomalies:   [],
-  forecast:    null,
-  productId:   '',
+  anomalies: [],
+  forecast: null,
+  productId: "",
   detectRunning: false,
 };
 
-let forecastChart  = null;
-let anomalyChart   = null;
+let forecastChart = null;
+let anomalyChart = null;
 
 /* ============================================================
    INIT
    ============================================================ */
-document.addEventListener('DOMContentLoaded', async () => {
-  await initShell('analytics', 'Analytics');
+document.addEventListener("DOMContentLoaded", async () => {
+  await initShell("analytics", "Analytics");
   await loadAnalytics();
 
   bindControls();
+  bindSimulationPanel();
+  bindGenerateForecast();
+  bindWarehouseAnalytics();
 
-  startPolling('analytics', async () => {
-    markSyncing();
-    await loadAnomalies(true);
-  }, 10000);
+  startPolling(
+    "analytics",
+    async () => {
+      markSyncing();
+      await loadAnomalies(true);
+    },
+    10000,
+  );
 });
 
 /* ============================================================
@@ -48,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    ============================================================ */
 async function loadAnalytics(silent = false) {
   if (!silent) {
-    showPageLoader('anomalies-container');
+    showPageLoader("anomalies-container");
   }
 
   await loadAnomalies(silent);
@@ -69,7 +85,11 @@ async function loadAnomalies(silent = false) {
     renderAnomalySummary();
     renderAnomalyChart();
   } catch (err) {
-    if (!silent) showError('anomalies-container', `Failed to load anomalies: ${err.message}`);
+    if (!silent)
+      showError(
+        "anomalies-container",
+        `Failed to load anomalies: ${err.message}`,
+      );
   }
 }
 
@@ -77,11 +97,11 @@ async function loadAnomalies(silent = false) {
    RENDER ANOMALIES LIST
    ============================================================ */
 function renderAnomalies() {
-  const container = document.getElementById('anomalies-container');
+  const container = document.getElementById("anomalies-container");
   if (!container) return;
 
   // Update count badge
-  const badge = document.getElementById('anomaly-count');
+  const badge = document.getElementById("anomaly-count");
   if (badge) badge.textContent = state.anomalies.length;
 
   if (state.anomalies.length === 0) {
@@ -96,56 +116,72 @@ function renderAnomalies() {
   }
 
   // Sort by severity: critical > warning > info
-  const severityOrder = { critical: 0, high: 0, warning: 1, medium: 1, info: 2, low: 2 };
+  const severityOrder = {
+    critical: 0,
+    high: 0,
+    warning: 1,
+    medium: 1,
+    info: 2,
+    low: 2,
+  };
   const sorted = [...state.anomalies].sort((a, b) => {
-    const sa = severityOrder[a.severity?.toLowerCase() ?? 'info'] ?? 2;
-    const sb = severityOrder[b.severity?.toLowerCase() ?? 'info'] ?? 2;
+    const sa = severityOrder[a.severity?.toLowerCase() ?? "info"] ?? 2;
+    const sb = severityOrder[b.severity?.toLowerCase() ?? "info"] ?? 2;
     return sa - sb;
   });
 
-  container.innerHTML = sorted.map(anomaly => anomalyCardHTML(anomaly)).join('');
+  container.innerHTML = sorted
+    .map((anomaly) => anomalyCardHTML(anomaly))
+    .join("");
+
+  // Bind resolve buttons
+  container.querySelectorAll(".btn-resolve-anomaly").forEach((btn) => {
+    btn.addEventListener("click", () => resolveAnomaly(btn.dataset.id, btn));
+  });
 }
 
 function anomalyCardHTML(anomaly) {
-  const severity  = (anomaly.severity ?? anomaly.level ?? 'info').toLowerCase();
-  const type      = anomaly.type ?? anomaly.anomaly_type ?? 'Unknown Anomaly';
-  const description = anomaly.description ?? anomaly.message ?? anomaly.detail ?? '—';
-  const product   = anomaly.product_id ?? anomaly.product ?? anomaly.sku ?? '';
-  const metric    = anomaly.metric ?? '';
-  const value     = anomaly.value ?? anomaly.actual_value ?? '';
-  const expected  = anomaly.expected_value ?? anomaly.threshold ?? '';
-  const detectedAt= anomaly.detected_at ?? anomaly.created_at ?? anomaly.timestamp;
+  const severity = (anomaly.severity ?? anomaly.level ?? "info").toLowerCase();
+  const type = anomaly.type ?? anomaly.anomaly_type ?? "Unknown Anomaly";
+  const description =
+    anomaly.description ?? anomaly.message ?? anomaly.detail ?? "—";
+  const product = anomaly.product_id ?? anomaly.product ?? anomaly.sku ?? "";
+  const metric = anomaly.metric ?? "";
+  const value = anomaly.value ?? anomaly.actual_value ?? "";
+  const expected = anomaly.expected_value ?? anomaly.threshold ?? "";
+  const detectedAt =
+    anomaly.detected_at ?? anomaly.created_at ?? anomaly.timestamp;
 
-  const isCritical = severity === 'critical' || severity === 'high';
-  const isWarning  = severity === 'warning'  || severity === 'medium';
+  const isCritical = severity === "critical" || severity === "high";
+  const isWarning = severity === "warning" || severity === "medium";
 
-  const borderColor = isCritical ? 'critical' : isWarning ? 'warning' : 'info';
+  const borderColor = isCritical ? "critical" : isWarning ? "warning" : "info";
 
   const iconMap = {
     critical: criticalIcon(),
-    high:     criticalIcon(),
-    warning:  warningIcon(),
-    medium:   warningIcon(),
-    info:     infoIcon(),
-    low:      infoIcon(),
+    high: criticalIcon(),
+    warning: warningIcon(),
+    medium: warningIcon(),
+    info: infoIcon(),
+    low: infoIcon(),
   };
 
   const bgMap = {
-    critical: 'var(--clr-danger-light)',
-    high:     'var(--clr-danger-light)',
-    warning:  'var(--clr-warning-light)',
-    medium:   'var(--clr-warning-light)',
-    info:     'var(--clr-info-light)',
-    low:      'var(--clr-info-light)',
+    critical: "var(--clr-danger-light)",
+    high: "var(--clr-danger-light)",
+    warning: "var(--clr-warning-light)",
+    medium: "var(--clr-warning-light)",
+    info: "var(--clr-info-light)",
+    low: "var(--clr-info-light)",
   };
 
   const colorMap = {
-    critical: 'var(--clr-danger)',
-    high:     'var(--clr-danger)',
-    warning:  'var(--clr-warning)',
-    medium:   'var(--clr-warning)',
-    info:     'var(--clr-info)',
-    low:      'var(--clr-info)',
+    critical: "var(--clr-danger)",
+    high: "var(--clr-danger)",
+    warning: "var(--clr-warning)",
+    medium: "var(--clr-warning)",
+    info: "var(--clr-info)",
+    low: "var(--clr-info)",
   };
 
   return `
@@ -155,20 +191,21 @@ function anomalyCardHTML(anomaly) {
         ${iconMap[severity] ?? infoIcon()}
       </div>
       <div class="anomaly-card__content">
-        <div class="anomaly-card__title">${escapeHtml(String(type).replace(/_/g, ' '))}</div>
+        <div class="anomaly-card__title">${escapeHtml(String(type).replace(/_/g, " "))}</div>
         <div class="anomaly-card__description">${escapeHtml(description)}</div>
         <div class="anomaly-card__meta">
-          ${product ? `<span>Product: <strong>${escapeHtml(product)}</strong></span>` : ''}
-          ${metric  ? `<span>Metric: ${escapeHtml(metric)}</span>` : ''}
-          ${value   ? `<span>Value: <strong>${escapeHtml(String(value))}</strong></span>` : ''}
-          ${expected? `<span>Expected: ${escapeHtml(String(expected))}</span>` : ''}
-          ${detectedAt ? `<span>${formatDate(detectedAt)}</span>` : ''}
+          ${product ? `<span>Product: <strong>${escapeHtml(product)}</strong></span>` : ""}
+          ${metric ? `<span>Metric: ${escapeHtml(metric)}</span>` : ""}
+          ${value ? `<span>Value: <strong>${escapeHtml(String(value))}</strong></span>` : ""}
+          ${expected ? `<span>Expected: ${escapeHtml(String(expected))}</span>` : ""}
+          ${detectedAt ? `<span>${formatDate(detectedAt)}</span>` : ""}
         </div>
       </div>
-      <div style="flex-shrink:0">
-        <span class="badge badge--${isCritical ? 'critical' : isWarning ? 'warning' : 'info'} badge--dot">
+      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:.5rem">
+        <span class="badge badge--${isCritical ? "critical" : isWarning ? "warning" : "info"} badge--dot">
           ${escapeHtml(severity)}
         </span>
+        ${anomaly.resolved_at ? `<span class="text-xs text-muted">Resolved</span>` : `<button class="btn btn--ghost btn--sm btn-resolve-anomaly" data-id="${escapeHtml(String(anomaly.id ?? anomaly.alert_id))}" style="font-size:.75rem">Resolve</button>`}
       </div>
     </div>`;
 }
@@ -177,57 +214,74 @@ function anomalyCardHTML(anomaly) {
    ANOMALY SUMMARY KPIs
    ============================================================ */
 function renderAnomalySummary() {
-  const bySeverity = (sev) => state.anomalies.filter(a =>
-    (a.severity ?? a.level ?? '').toLowerCase() === sev
-  ).length;
+  const bySeverity = (sev) =>
+    state.anomalies.filter(
+      (a) => (a.severity ?? a.level ?? "").toLowerCase() === sev,
+    ).length;
 
   const setStat = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   };
 
-  setStat('stat-critical', bySeverity('critical') + bySeverity('high'));
-  setStat('stat-warnings',  bySeverity('warning')  + bySeverity('medium'));
-  setStat('stat-info-anom', bySeverity('info')      + bySeverity('low'));
-  setStat('stat-total-anom', state.anomalies.length);
+  setStat("stat-critical", bySeverity("critical") + bySeverity("high"));
+  setStat("stat-warnings", bySeverity("warning") + bySeverity("medium"));
+  setStat("stat-info-anom", bySeverity("info") + bySeverity("low"));
+  setStat("stat-total-anom", state.anomalies.length);
 }
 
 /* ============================================================
    ANOMALY SEVERITY CHART
    ============================================================ */
 function renderAnomalyChart() {
-  const canvas = document.getElementById('anomaly-severity-chart');
+  const canvas = document.getElementById("anomaly-severity-chart");
   if (!canvas) return;
 
-  const critical = state.anomalies.filter(a => ['critical', 'high'].includes(a.severity?.toLowerCase())).length;
-  const warning  = state.anomalies.filter(a => ['warning', 'medium'].includes(a.severity?.toLowerCase())).length;
-  const info     = state.anomalies.filter(a => ['info', 'low'].includes(a.severity?.toLowerCase())).length;
+  const critical = state.anomalies.filter((a) =>
+    ["critical", "high"].includes(a.severity?.toLowerCase()),
+  ).length;
+  const warning = state.anomalies.filter((a) =>
+    ["warning", "medium"].includes(a.severity?.toLowerCase()),
+  ).length;
+  const info = state.anomalies.filter((a) =>
+    ["info", "low"].includes(a.severity?.toLowerCase()),
+  ).length;
 
   if (anomalyChart) anomalyChart.destroy();
 
   anomalyChart = new Chart(canvas, {
-    type: 'doughnut',
+    type: "doughnut",
     data: {
-      labels: ['Critical', 'Warning', 'Info'],
-      datasets: [{
-        data: [critical, warning, info],
-        backgroundColor: [CHART_COLORS.danger, CHART_COLORS.warning, CHART_COLORS.info],
-        borderWidth: 2,
-        borderColor: '#fff',
-        hoverOffset: 4,
-      }],
+      labels: ["Critical", "Warning", "Info"],
+      datasets: [
+        {
+          data: [critical, warning, info],
+          backgroundColor: [
+            CHART_COLORS.danger,
+            CHART_COLORS.warning,
+            CHART_COLORS.info,
+          ],
+          borderWidth: 2,
+          borderColor: "#fff",
+          hoverOffset: 4,
+        },
+      ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '60%',
+      cutout: "60%",
       plugins: {
         legend: {
-          position: 'bottom',
-          labels: { font: { family: "'Inter', sans-serif", size: 12 }, padding: 12, usePointStyle: true },
+          position: "bottom",
+          labels: {
+            font: { family: "'Inter', sans-serif", size: 12 },
+            padding: 12,
+            usePointStyle: true,
+          },
         },
         tooltip: {
-          backgroundColor: '#0F172A',
+          backgroundColor: "#0F172A",
           bodyFont: { family: "'Inter', sans-serif", size: 12 },
           padding: 10,
           cornerRadius: 8,
@@ -244,22 +298,25 @@ async function detectAnomalies() {
   if (state.detectRunning) return;
   state.detectRunning = true;
 
-  const btn = document.getElementById('detect-btn');
+  const btn = document.getElementById("detect-btn");
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner spinner--sm spinner--white"></div> Detecting…';
+    btn.innerHTML =
+      '<div class="spinner spinner--sm spinner--white"></div> Detecting…';
   }
 
   try {
-    const result = await Analytics.detectAnomalies({});
-    const count  = result?.count ?? result?.anomalies?.length ?? 0;
+    const result = await Analytics.detectAnomalies(7);
+    const count = result?.count ?? result?.anomalies?.length ?? 0;
 
-    toast(`Anomaly detection complete. Found ${count} anomaly${count !== 1 ? 's' : ''}.`,
-      count > 0 ? 'warning' : 'success');
+    toast(
+      `Anomaly detection complete. Found ${count} anomaly${count !== 1 ? "s" : ""}.`,
+      count > 0 ? "warning" : "success",
+    );
 
     await loadAnomalies(false);
   } catch (err) {
-    toast(`Detection failed: ${err.message}`, 'error');
+    toast(`Detection failed: ${err.message}`, "error");
   } finally {
     state.detectRunning = false;
     if (btn) {
@@ -281,13 +338,14 @@ async function loadForecast(productId) {
   if (!productId) return;
   state.productId = productId;
 
-  const container = document.getElementById('forecast-container');
+  const container = document.getElementById("forecast-container");
   if (container) {
-    container.innerHTML = '<div class="page-loading"><div class="spinner"></div><span>Loading forecast…</span></div>';
+    container.innerHTML =
+      '<div class="page-loading"><div class="spinner"></div><span>Loading forecast…</span></div>';
   }
 
   try {
-    const data = await Analytics.getForecast(productId);
+    const data = await Forecasts.getByProduct(productId);
     state.forecast = data;
     renderForecast(data);
   } catch (err) {
@@ -301,7 +359,7 @@ async function loadForecast(productId) {
 }
 
 function renderForecast(data) {
-  const container = document.getElementById('forecast-container');
+  const container = document.getElementById("forecast-container");
   if (!container) return;
 
   const forecast = data?.forecast ?? data?.predictions ?? data ?? [];
@@ -316,11 +374,19 @@ function renderForecast(data) {
     return;
   }
 
-  const labels   = forecast.map(f => formatDate(f.date ?? f.period ?? f.ds));
-  const actuals  = forecast.map(f => f.actual ?? f.y ?? null).filter(v => v != null);
-  const predicted= forecast.map(f => f.predicted ?? f.forecast ?? f.yhat ?? 0);
-  const upper    = forecast.map(f => f.upper_bound ?? f.yhat_upper ?? null).filter(v => v != null);
-  const lower    = forecast.map(f => f.lower_bound ?? f.yhat_lower ?? null).filter(v => v != null);
+  const labels = forecast.map((f) => formatDate(f.date ?? f.period ?? f.ds));
+  const actuals = forecast
+    .map((f) => f.actual ?? f.y ?? null)
+    .filter((v) => v != null);
+  const predicted = forecast.map(
+    (f) => f.predicted ?? f.forecast ?? f.yhat ?? 0,
+  );
+  const upper = forecast
+    .map((f) => f.upper_bound ?? f.yhat_upper ?? null)
+    .filter((v) => v != null);
+  const lower = forecast
+    .map((f) => f.lower_bound ?? f.yhat_lower ?? null)
+    .filter((v) => v != null);
 
   container.innerHTML = `
     <div class="chart-card">
@@ -337,15 +403,15 @@ function renderForecast(data) {
       </div>
     </div>`;
 
-  const canvas = document.getElementById('forecast-chart');
+  const canvas = document.getElementById("forecast-chart");
   if (!canvas) return;
 
   const datasets = [
     {
-      label: 'Forecasted',
+      label: "Forecasted",
       data: predicted,
       borderColor: CHART_COLORS.primary,
-      backgroundColor: 'rgba(37,99,235,0.08)',
+      backgroundColor: "rgba(37,99,235,0.08)",
       borderWidth: 2.5,
       pointRadius: 3,
       fill: true,
@@ -355,10 +421,10 @@ function renderForecast(data) {
 
   if (actuals.length > 0) {
     datasets.unshift({
-      label: 'Actual',
+      label: "Actual",
       data: [...actuals, ...Array(labels.length - actuals.length).fill(null)],
       borderColor: CHART_COLORS.success,
-      backgroundColor: 'transparent',
+      backgroundColor: "transparent",
       borderWidth: 2,
       pointRadius: 4,
       fill: false,
@@ -368,21 +434,21 @@ function renderForecast(data) {
 
   if (upper.length > 0) {
     datasets.push({
-      label: 'Upper Bound',
+      label: "Upper Bound",
       data: upper,
-      borderColor: 'rgba(37,99,235,0.2)',
-      backgroundColor: 'rgba(37,99,235,0.04)',
+      borderColor: "rgba(37,99,235,0.2)",
+      backgroundColor: "rgba(37,99,235,0.04)",
       borderWidth: 1,
       borderDash: [4, 4],
       pointRadius: 0,
-      fill: '-1',
+      fill: "-1",
       tension: 0.4,
     });
   }
 
   if (forecastChart) forecastChart.destroy();
   forecastChart = new Chart(canvas, {
-    type: 'line',
+    type: "line",
     data: { labels, datasets },
     options: chartDefaults(),
   });
@@ -395,41 +461,43 @@ async function loadDashboardInsights() {
   try {
     const data = await Analytics.getDashboard();
     renderInsights(data);
-  } catch (_) { /* silently skip */ }
+  } catch (_) {
+    /* silently skip */
+  }
 }
 
 function renderInsights(data) {
   if (!data) return;
 
-  const insightsEl = document.getElementById('insights-container');
+  const insightsEl = document.getElementById("insights-container");
   if (!insightsEl) return;
 
   const orderKpis = data.order_kpis ?? {};
-  const invKpis   = data.inventory_kpis ?? {};
+  const invKpis = data.inventory_kpis ?? {};
 
-  const totalOrders      = orderKpis.total_orders ?? data.total_orders ?? 0;
-  const lowStock         = invKpis.items_below_reorder ?? data.low_stock_alerts ?? 0;
+  const totalOrders = orderKpis.total_orders ?? data.total_orders ?? 0;
+  const lowStock = invKpis.items_below_reorder ?? data.low_stock_alerts ?? 0;
 
   const fulfillRate = ((orderKpis.fulfillment_rate ?? 0) * 100).toFixed(1);
-  const onTimeRate  = orderKpis.on_time_delivery_rate ?? 1;
-  const delayRate   = ((1 - onTimeRate) * 100).toFixed(1);
+  const onTimeRate = orderKpis.on_time_delivery_rate ?? 1;
+  const delayRate = ((1 - onTimeRate) * 100).toFixed(1);
 
   insightsEl.innerHTML = `
     <div class="stat-row">
       <span class="stat-row__label">Fulfillment Rate</span>
-      <span class="stat-row__value" style="color:${fulfillRate >= 90 ? 'var(--clr-success)' : 'var(--clr-warning)'}">
+      <span class="stat-row__value" style="color:${fulfillRate >= 90 ? "var(--clr-success)" : "var(--clr-warning)"}">
         ${formatPercent(fulfillRate)}
       </span>
     </div>
     <div class="stat-row">
       <span class="stat-row__label">Shipment Delay Rate</span>
-      <span class="stat-row__value" style="color:${delayRate > 10 ? 'var(--clr-danger)' : 'var(--clr-success)'}">
+      <span class="stat-row__value" style="color:${delayRate > 10 ? "var(--clr-danger)" : "var(--clr-success)"}">
         ${formatPercent(delayRate)}
       </span>
     </div>
     <div class="stat-row">
       <span class="stat-row__label">Low Stock Items</span>
-      <span class="stat-row__value" style="color:${lowStock > 0 ? 'var(--clr-warning)' : 'var(--clr-success)'}">
+      <span class="stat-row__value" style="color:${lowStock > 0 ? "var(--clr-warning)" : "var(--clr-success)"}">
         ${formatNumber(lowStock)}
       </span>
     </div>
@@ -439,7 +507,7 @@ function renderInsights(data) {
     </div>
     <div class="stat-row">
       <span class="stat-row__label">Anomalies Detected</span>
-      <span class="stat-row__value" style="color:${state.anomalies.length > 0 ? 'var(--clr-danger)' : 'var(--clr-success)'}">
+      <span class="stat-row__value" style="color:${state.anomalies.length > 0 ? "var(--clr-danger)" : "var(--clr-success)"}">
         ${state.anomalies.length}
       </span>
     </div>`;
@@ -450,40 +518,53 @@ function renderInsights(data) {
    ============================================================ */
 function bindControls() {
   // Detect anomalies button
-  document.getElementById('detect-btn')?.addEventListener('click', detectAnomalies);
+  document
+    .getElementById("detect-btn")
+    ?.addEventListener("click", detectAnomalies);
 
   // Forecast search
-  const forecastInput = document.getElementById('forecast-product-input');
-  const forecastBtn   = document.getElementById('forecast-search-btn');
+  const forecastInput = document.getElementById("forecast-product-input");
+  const forecastBtn = document.getElementById("forecast-search-btn");
 
   const doForecast = () => {
     const val = forecastInput?.value?.trim();
-    if (!val) { toast('Enter a product ID or SKU', 'warning'); return; }
+    if (!val) {
+      toast("Enter a product ID or SKU", "warning");
+      return;
+    }
     loadForecast(val);
   };
 
-  forecastBtn?.addEventListener('click', doForecast);
-  forecastInput?.addEventListener('keydown', e => { if (e.key === 'Enter') doForecast(); });
+  forecastBtn?.addEventListener("click", doForecast);
+  forecastInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doForecast();
+  });
 
   // Severity filter
-  const severityFilter = document.getElementById('filter-severity');
+  const severityFilter = document.getElementById("filter-severity");
   if (severityFilter) {
-    severityFilter.addEventListener('change', () => {
+    severityFilter.addEventListener("change", () => {
       const val = severityFilter.value.toLowerCase();
-      const filtered = !val ? state.anomalies
-        : state.anomalies.filter(a =>
-            (a.severity ?? a.level ?? '').toLowerCase() === val
-            || (val === 'critical' && (a.severity ?? '').toLowerCase() === 'high')
-            || (val === 'warning'  && (a.severity ?? '').toLowerCase() === 'medium')
-            || (val === 'info'     && (a.severity ?? '').toLowerCase() === 'low')
+      const filtered = !val
+        ? state.anomalies
+        : state.anomalies.filter(
+            (a) =>
+              (a.severity ?? a.level ?? "").toLowerCase() === val ||
+              (val === "critical" &&
+                (a.severity ?? "").toLowerCase() === "high") ||
+              (val === "warning" &&
+                (a.severity ?? "").toLowerCase() === "medium") ||
+              (val === "info" && (a.severity ?? "").toLowerCase() === "low"),
           );
 
-      const container = document.getElementById('anomalies-container');
+      const container = document.getElementById("anomalies-container");
       if (!container) return;
       if (filtered.length === 0) {
-        showEmpty('anomalies-container', `No ${val || ''} anomalies`, '');
+        showEmpty("anomalies-container", `No ${val || ""} anomalies`, "");
       } else {
-        container.innerHTML = filtered.map(anomaly => anomalyCardHTML(anomaly)).join('');
+        container.innerHTML = filtered
+          .map((anomaly) => anomalyCardHTML(anomaly))
+          .join("");
       }
     });
   }
@@ -511,4 +592,136 @@ function infoIcon() {
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
       d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
   </svg>`;
+}
+
+/* ============================================================
+   RESOLVE ANOMALY
+   ============================================================ */
+async function resolveAnomaly(alertId, btn) {
+  btn.disabled = true;
+  btn.textContent = "Resolving…";
+  try {
+    await Analytics.resolveAnomaly(alertId);
+    toast("Anomaly resolved", "success");
+    await loadAnomalies(false);
+  } catch (err) {
+    toast(`Failed to resolve: ${err.message}`, "error");
+    btn.disabled = false;
+    btn.textContent = "Resolve";
+  }
+}
+
+/* ============================================================
+   SIMULATION PANEL
+   ============================================================ */
+function bindSimulationPanel() {
+  const runBtn = document.getElementById("run-simulation-btn");
+  if (!runBtn) return;
+
+  runBtn.addEventListener("click", async () => {
+    const scenario =
+      document.getElementById("sim-scenario")?.value?.trim() || "demand_spike";
+    const params = document.getElementById("sim-params")?.value?.trim();
+
+    runBtn.disabled = true;
+    runBtn.innerHTML =
+      '<div class="spinner spinner--sm spinner--white"></div> Running…';
+
+    try {
+      const body = { scenario };
+      if (params) {
+        try {
+          body.parameters = JSON.parse(params);
+        } catch (_) {
+          body.parameters = {};
+        }
+      }
+      const result = await Analytics.runSimulation(body);
+      const resultEl = document.getElementById("simulation-result");
+      if (resultEl) {
+        resultEl.classList.remove("hidden");
+        resultEl.innerHTML = `
+          <div class="alert alert--info" style="margin-top:1rem">
+            <span><strong>Simulation Complete</strong></span>
+          </div>
+          <pre style="background:var(--clr-bg-secondary);padding:1rem;border-radius:8px;overflow-x:auto;font-size:.8125rem;margin-top:.5rem">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+      }
+      toast("Simulation completed", "success");
+    } catch (err) {
+      toast(`Simulation failed: ${err.message}`, "error");
+    } finally {
+      runBtn.disabled = false;
+      runBtn.innerHTML = "Run Simulation";
+    }
+  });
+}
+
+/* ============================================================
+   GENERATE FORECAST
+   ============================================================ */
+function bindGenerateForecast() {
+  const btn = document.getElementById("generate-forecast-btn");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const productId = document
+      .getElementById("forecast-product-input")
+      ?.value?.trim();
+    if (!productId) {
+      toast("Enter a product ID first", "warning");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner spinner--sm spinner--white"></div>';
+
+    try {
+      await Forecasts.generate({ product_id: productId });
+      toast("Forecast generated, loading results…", "success");
+      await loadForecast(productId);
+    } catch (err) {
+      toast(`Forecast generation failed: ${err.message}`, "error");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "Generate";
+    }
+  });
+}
+
+/* ============================================================
+   WAREHOUSE ANALYTICS
+   ============================================================ */
+function bindWarehouseAnalytics() {
+  const sel = document.getElementById("wh-analytics-select");
+  if (!sel) return;
+
+  // Populate warehouse dropdown
+  Warehouses.getAll()
+    .then((data) => {
+      const list = Array.isArray(data) ? data : [];
+      list.forEach((wh) => {
+        const opt = document.createElement("option");
+        opt.value = wh.id;
+        opt.textContent = wh.name || wh.code;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(() => {});
+
+  sel.addEventListener("change", async () => {
+    const whId = sel.value;
+    const container = document.getElementById("wh-analytics-content");
+    if (!whId || !container) return;
+
+    container.innerHTML =
+      '<div class="page-loading"><div class="spinner"></div><span>Loading…</span></div>';
+
+    try {
+      const data = await Analytics.getWarehouseAnalytics(whId);
+      container.innerHTML = `
+        <pre style="background:var(--clr-bg-secondary);padding:1rem;border-radius:8px;overflow-x:auto;font-size:.8125rem">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+    } catch (err) {
+      container.innerHTML = `<div class="alert alert--danger"><span>${escapeHtml(err.message)}</span></div>`;
+    }
+  });
 }

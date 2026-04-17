@@ -1,138 +1,414 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Warehouses — SCM Platform</title>
-  <link rel="stylesheet" href="../css/global.css"/>
-  <link rel="stylesheet" href="../css/layout.css"/>
-  <link rel="stylesheet" href="../css/components.css"/>
-  <style>
-    .warehouse-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 1rem;
-    }
-  </style>
-</head>
-<body>
-  <div class="app-shell">
-    <div id="sidebar-container"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Warehouses — SCM Platform</title>
+    <link rel="stylesheet" href="../css/global.css" />
+    <link rel="stylesheet" href="../css/layout.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <style>
+      .warehouse-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div id="sidebar-container"></div>
 
-    <div style="flex:1;min-width:0">
-      <div id="navbar-container"></div>
+      <div style="flex: 1; min-width: 0">
+        <div id="navbar-container"></div>
 
-      <main class="main-content">
-
-        <!-- Page Header -->
-        <div class="page-header">
-          <div class="page-header__left">
-            <h1 class="page-header__title">Warehouses</h1>
-            <p class="page-header__subtitle">Facilities, zones, and bin management</p>
+        <main class="main-content">
+          <!-- Page Header -->
+          <div class="page-header">
+            <div class="page-header__left">
+              <h1 class="page-header__title">Warehouses</h1>
+              <p class="page-header__subtitle">
+                Facilities, zones, and bin management
+              </p>
+            </div>
+            <div class="page-header__actions">
+              <button class="btn btn--primary btn--sm" id="create-wh-btn">
+                + New Warehouse
+              </button>
+              <button class="btn btn--secondary btn--sm" id="create-zone-btn">
+                + Zone
+              </button>
+              <button class="btn btn--secondary btn--sm" id="create-bin-btn">
+                + Bin
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- Summary KPIs -->
-        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:1.75rem">
-          <div class="kpi-card kpi-card--blue">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--blue">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                </svg>
+          <!-- Summary KPIs -->
+          <div
+            class="kpi-grid"
+            style="
+              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              margin-bottom: 1.75rem;
+            "
+          >
+            <div class="kpi-card kpi-card--blue">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--blue">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-total-wh">—</div>
+              <div class="kpi-card__label">Total Warehouses</div>
+            </div>
+
+            <div class="kpi-card kpi-card--green">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--green">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-active-wh">—</div>
+              <div class="kpi-card__label">Active</div>
+            </div>
+
+            <div class="kpi-card kpi-card--purple">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--purple">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-capacity">—</div>
+              <div class="kpi-card__label">Total Capacity</div>
+            </div>
+
+            <div class="kpi-card kpi-card--yellow">
+              <div class="kpi-card__header">
+                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--yellow">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="kpi-card__value" id="stat-zones">—</div>
+              <div class="kpi-card__label">Total Zones</div>
+            </div>
+          </div>
+
+          <!-- Section Header -->
+          <div class="section-header">
+            <div>
+              <div class="section-title">All Warehouses</div>
+              <div class="section-subtitle">
+                Click a card to view zones and bins
               </div>
             </div>
-            <div class="kpi-card__value" id="stat-total-wh">—</div>
-            <div class="kpi-card__label">Total Warehouses</div>
           </div>
 
-          <div class="kpi-card kpi-card--green">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--green">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-              </div>
+          <!-- Warehouse Cards Grid -->
+          <div id="warehouses-container">
+            <div class="warehouse-grid">
+              <div
+                class="skeleton"
+                style="height: 220px; border-radius: 14px"
+              ></div>
+              <div
+                class="skeleton"
+                style="height: 220px; border-radius: 14px"
+              ></div>
+              <div
+                class="skeleton"
+                style="height: 220px; border-radius: 14px"
+              ></div>
             </div>
-            <div class="kpi-card__value" id="stat-active-wh">—</div>
-            <div class="kpi-card__label">Active</div>
           </div>
-
-          <div class="kpi-card kpi-card--purple">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--purple">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-card__value" id="stat-capacity">—</div>
-            <div class="kpi-card__label">Total Capacity</div>
-          </div>
-
-          <div class="kpi-card kpi-card--yellow">
-            <div class="kpi-card__header">
-              <div class="kpi-card__icon-wrap kpi-card__icon-wrap--yellow">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-card__value" id="stat-zones">—</div>
-            <div class="kpi-card__label">Total Zones</div>
-          </div>
-        </div>
-
-        <!-- Section Header -->
-        <div class="section-header">
-          <div>
-            <div class="section-title">All Warehouses</div>
-            <div class="section-subtitle">Click a card to view zones and bins</div>
-          </div>
-        </div>
-
-        <!-- Warehouse Cards Grid -->
-        <div id="warehouses-container">
-          <div class="warehouse-grid">
-            <div class="skeleton" style="height:220px;border-radius:14px"></div>
-            <div class="skeleton" style="height:220px;border-radius:14px"></div>
-            <div class="skeleton" style="height:220px;border-radius:14px"></div>
-          </div>
-        </div>
-
-      </main>
+        </main>
+      </div>
     </div>
-  </div>
 
-  <!-- ===================================================
+    <!-- ===================================================
        ZONES MODAL
        =================================================== -->
-  <div class="modal-backdrop" id="zones-modal-backdrop">
-    <div class="modal modal--wide">
-      <div class="modal__header">
-        <div>
-          <div class="modal__title" id="modal-wh-name">Warehouse Zones</div>
-          <div style="font-size:.8125rem;color:var(--clr-text-secondary);margin-top:.125rem" id="modal-wh-location"></div>
+    <div class="modal-backdrop" id="zones-modal-backdrop">
+      <div class="modal modal--wide">
+        <div class="modal__header">
+          <div>
+            <div class="modal__title" id="modal-wh-name">Warehouse Zones</div>
+            <div
+              style="
+                font-size: 0.8125rem;
+                color: var(--clr-text-secondary);
+                margin-top: 0.125rem;
+              "
+              id="modal-wh-location"
+            ></div>
+          </div>
+          <button class="modal__close" id="modal-close-btn">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
-        <button class="modal__close" id="modal-close-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-      <div class="modal__body" id="zones-content">
-        <div class="page-loading">
-          <div class="spinner"></div>
-          <span>Loading zones…</span>
+        <div class="modal__body" id="zones-content">
+          <div class="page-loading">
+            <div class="spinner"></div>
+            <span>Loading zones…</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div id="toast-container" class="toast-container"></div>
-  <script type="module" src="../js/warehouses.js"></script>
-</body>
+    <!-- Create Warehouse Modal -->
+    <div class="modal-backdrop" id="create-wh-modal">
+      <div class="modal">
+        <div class="modal__header">
+          <div class="modal__title">Create Warehouse</div>
+          <button class="modal__close" id="create-wh-cancel">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem"
+          >
+            <div class="form-group">
+              <label class="form-label required">Name</label
+              ><input
+                class="form-input"
+                id="wh-name"
+                placeholder="Main Distribution Center"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label required">Code</label
+              ><input class="form-input" id="wh-code" placeholder="WH-001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Type</label
+              ><select class="form-select" id="wh-type">
+                <option value="standard">Standard</option>
+                <option value="cold_storage">Cold Storage</option>
+                <option value="distribution_center">Distribution Center</option>
+                <option value="cross_dock">Cross Dock</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">City</label
+              ><input class="form-input" id="wh-city" placeholder="Dallas" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">State</label
+              ><input class="form-input" id="wh-state" placeholder="TX" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Capacity (sqft)</label
+              ><input
+                type="number"
+                class="form-input"
+                id="wh-capacity"
+                placeholder="50000"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Throughput/Day</label
+              ><input
+                type="number"
+                class="form-input"
+                id="wh-throughput"
+                placeholder="1000"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" id="create-wh-cancel-footer">
+            Cancel
+          </button>
+          <button class="btn btn--primary" id="create-wh-submit">
+            Create Warehouse
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Zone Modal -->
+    <div class="modal-backdrop" id="create-zone-modal">
+      <div class="modal">
+        <div class="modal__header">
+          <div class="modal__title">Create Zone</div>
+          <button class="modal__close" id="create-zone-cancel">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label required">Warehouse</label
+            ><select class="form-select" id="zone-warehouse">
+              <option value="">Select warehouse</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Zone Name</label
+            ><input class="form-input" id="zone-name" placeholder="Zone A" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Zone Type</label
+            ><select class="form-select" id="zone-type">
+              <option value="storage">Storage</option>
+              <option value="picking">Picking</option>
+              <option value="packing">Packing</option>
+              <option value="receiving">Receiving</option>
+              <option value="shipping">Shipping</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" id="create-zone-cancel-footer">
+            Cancel
+          </button>
+          <button class="btn btn--primary" id="create-zone-submit">
+            Create Zone
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Bin Modal -->
+    <div class="modal-backdrop" id="create-bin-modal">
+      <div class="modal">
+        <div class="modal__header">
+          <div class="modal__title">Create Bin</div>
+          <button class="modal__close" id="create-bin-cancel">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label required">Zone ID</label
+            ><input
+              class="form-input"
+              id="bin-zone-id"
+              placeholder="Zone UUID"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Bin Code</label
+            ><input class="form-input" id="bin-code" placeholder="BIN-A01" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Capacity</label
+            ><input
+              type="number"
+              class="form-input"
+              id="bin-capacity"
+              placeholder="100"
+            />
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" id="create-bin-cancel-footer">
+            Cancel
+          </button>
+          <button class="btn btn--primary" id="create-bin-submit">
+            Create Bin
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+    <script type="module" src="../js/warehouses.js"></script>
+  </body>
 </html>

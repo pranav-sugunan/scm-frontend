@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PORT=8080
+PORT=3000
 DIR="$(cd "$(dirname "$0")/frontend" && pwd)"
 
 echo "Starting SCM Frontend..."

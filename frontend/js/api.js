@@ -3,11 +3,11 @@
  * All HTTP communication with the FastAPI backend.
  * Base URL: http://localhost:8000/api/v1
  *
- * Pattern: async/await + error normalisation
- * Every function returns data or throws an ApiError.
+ * Covers ALL backend endpoints: Warehouses, Products, Inventory,
+ * Orders, Shipments, Forecasts, Analytics.
  */
 
-const BASE_URL = 'http://localhost:8000/api/v1';
+const BASE_URL = "http://localhost:8000/api/v1";
 
 /* ============================================================
    CUSTOM ERROR CLASS
@@ -15,7 +15,7 @@ const BASE_URL = 'http://localhost:8000/api/v1';
 class ApiError extends Error {
   constructor(message, status, detail) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.status = status;
     this.detail = detail;
   }
@@ -27,12 +27,12 @@ class ApiError extends Error {
 async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   const config = {
     headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
       ...options.headers,
     },
     ...options,
@@ -43,159 +43,225 @@ async function request(endpoint, options = {}) {
     const response = await fetch(url, config);
     clearTimeout(timeoutId);
 
-    // Handle non-2xx responses
     if (!response.ok) {
       let detail = `HTTP ${response.status}`;
       try {
         const errBody = await response.json();
         detail = errBody.detail || errBody.message || detail;
-      } catch (_) { /* ignore parse errors */ }
+      } catch (_) {}
       throw new ApiError(`Request failed: ${detail}`, response.status, detail);
     }
 
-    // 204 No Content
     if (response.status === 204) return null;
-
     return await response.json();
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof ApiError) throw err;
-    if (err.name === 'AbortError') {
-      throw new ApiError('Request timed out', 0, 'timeout');
+    if (err.name === "AbortError") {
+      throw new ApiError("Request timed out", 0, "timeout");
     }
-    // Network / CORS / parse errors
-    throw new ApiError(
-      `Network error: ${err.message}`,
-      0,
-      err.message
-    );
+    throw new ApiError(`Network error: ${err.message}`, 0, err.message);
   }
 }
 
-/* Convenience methods */
-const get    = (endpoint, params = {}) => {
+/* ============================================================
+   CONVENIENCE METHODS (support query params on all verbs)
+   ============================================================ */
+function buildQS(params = {}) {
   const qs = new URLSearchParams(
-    Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    Object.entries(params).filter(
+      ([, v]) => v !== "" && v !== null && v !== undefined,
+    ),
   ).toString();
-  return request(qs ? `${endpoint}?${qs}` : endpoint);
-};
-const post   = (endpoint, body)         => request(endpoint, { method: 'POST',  body: JSON.stringify(body) });
-const patch  = (endpoint, body)         => request(endpoint, { method: 'PATCH', body: JSON.stringify(body) });
-const del    = (endpoint)               => request(endpoint, { method: 'DELETE' });
-
-async function getFirstSuccessful(endpoints, params = {}) {
-  let lastErr = null;
-  for (const endpoint of endpoints) {
-    try {
-      return await get(endpoint, params);
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr || new ApiError('Request failed for all fallback endpoints', 0, 'fallback_failed');
+  return qs ? `?${qs}` : "";
 }
 
+const get = (endpoint, params = {}) => request(`${endpoint}${buildQS(params)}`);
+
+const post = (endpoint, body = null, params = {}) => {
+  const opts = { method: "POST" };
+  if (body !== null && body !== undefined) opts.body = JSON.stringify(body);
+  return request(`${endpoint}${buildQS(params)}`, opts);
+};
+
+const patch = (endpoint, body = null, params = {}) => {
+  const opts = { method: "PATCH" };
+  if (body !== null && body !== undefined) opts.body = JSON.stringify(body);
+  return request(`${endpoint}${buildQS(params)}`, opts);
+};
+
+const del = (endpoint) => request(endpoint, { method: "DELETE" });
+
 /* ============================================================
-   ANALYTICS / DASHBOARD
+   WAREHOUSES
+   POST   /warehouses/                     — Create Warehouse
+   GET    /warehouses/                     — List Warehouses
+   GET    /warehouses/{id}                 — Get Warehouse
+   PATCH  /warehouses/{id}                 — Update Warehouse
+   DELETE /warehouses/{id}                 — Delete Warehouse
+   POST   /warehouses/zones                — Create Zone
+   GET    /warehouses/{id}/zones           — List Zones
+   POST   /warehouses/bins                 — Create Bin
+   GET    /warehouses/zones/{zone_id}/bins — List Bins
    ============================================================ */
-export const Analytics = {
-  getDashboard: ()               => get('/analytics/dashboard'),
-  getAnomalies: ()               => get('/analytics/anomalies'),
-  detectAnomalies: (body = {})   => post('/analytics/anomalies/detect', body),
-  getForecast: (productId)       => get(`/forecasts/${productId}`),
+export const Warehouses = {
+  create: (body) => post("/warehouses/", body),
+  getAll: (params = {}) => get("/warehouses/", params),
+  getById: (id) => get(`/warehouses/${id}`),
+  update: (id, body) => patch(`/warehouses/${id}`, body),
+  delete: (id) => del(`/warehouses/${id}`),
+  createZone: (body) => post("/warehouses/zones", body),
+  getZones: (id) => get(`/warehouses/${id}/zones`),
+  createBin: (body) => post("/warehouses/bins", body),
+  getBins: (zoneId) => get(`/warehouses/zones/${zoneId}/bins`),
 };
 
 /* ============================================================
-   ORDERS
+   PRODUCTS
+   POST /products/                  — Create Product
+   GET  /products/                  — List Products
+   GET  /products/{id}              — Get Product
+   PATCH /products/{id}             — Update Product
+   GET  /products/{id}/similar      — Get Similar Products
+   POST /products/categories        — Create Category
+   GET  /products/categories/list   — List Categories
    ============================================================ */
-export const Orders = {
-  getAll: (params = {}) => getFirstSuccessful(['/orders/', '/orders'], params),
-  getById: (id)         => get(`/orders/${id}`),
-  updateStatus: (id, status) =>
-    patch(`/orders/${id}/status`, { status }),
-  allocate: (id)        => post(`/orders/${id}/auto-allocate`, {}),
+export const Products = {
+  create: (body) => post("/products/", body),
+  getAll: (params = {}) => get("/products/", params),
+  getById: (id) => get(`/products/${id}`),
+  update: (id, body) => patch(`/products/${id}`, body),
+  getSimilar: (id, topK = 5) => get(`/products/${id}/similar`, { top_k: topK }),
+  createCategory: (body) => post("/products/categories", body),
+  getCategories: () => get("/products/categories/list"),
 };
 
 /* ============================================================
    INVENTORY
+   GET  /inventory/items                    — List All Stock
+   GET  /inventory/stock-level              — Get Stock Level
+   GET  /inventory/warehouse/{warehouse_id} — List Inventory
+   POST /inventory/receive                  — Receive Stock
+   POST /inventory/transfer                 — Transfer Stock
+   POST /inventory/adjust                   — Adjust Stock
+   GET  /inventory/below-reorder            — Items Below Reorder
+   GET  /inventory/movements                — List Movements
    ============================================================ */
 export const Inventory = {
-  getStockLevels: async (params = {}) => {
-    try {
-      return await getFirstSuccessful(['/inventory/items', '/inventory/items/'], params);
-    } catch (err) {
-      // Older backend builds may not expose /inventory/items.
-      if (err?.status !== 404) throw err;
-
-      const warehouses = await getFirstSuccessful(['/warehouses/', '/warehouses']);
-      const whList = Array.isArray(warehouses) ? warehouses : (warehouses?.items ?? []);
-
-      if (!Array.isArray(whList) || whList.length === 0) return [];
-
-      const stockByWarehouse = await Promise.allSettled(
-        whList
-          .map(w => w?.id ?? w?.warehouse_id)
-          .filter(Boolean)
-          .map(id => get(`/inventory/warehouse/${id}`))
-      );
-
-      return stockByWarehouse
-        .filter(r => r.status === 'fulfilled')
-        .flatMap(r => (Array.isArray(r.value) ? r.value : []));
-    }
-  },
-  getMovements: (params = {})   => get('/inventory/movements', params),
-  getBelowReorder: ()           => get('/inventory/below-reorder'),
+  getAllStock: (params = {}) => get("/inventory/items", params),
+  getStockLevel: (productId, warehouseId) =>
+    get("/inventory/stock-level", {
+      product_id: productId,
+      warehouse_id: warehouseId,
+    }),
+  getByWarehouse: (warehouseId, params = {}) =>
+    get(`/inventory/warehouse/${warehouseId}`, params),
+  receiveStock: (body) => post("/inventory/receive", body),
+  transferStock: (body) => post("/inventory/transfer", body),
+  adjustStock: (body) => post("/inventory/adjust", body),
+  getBelowReorder: () => get("/inventory/below-reorder"),
+  getMovements: (params = {}) => get("/inventory/movements", params),
 };
 
 /* ============================================================
-   WAREHOUSES
+   ORDERS
+   POST  /orders/                     — Create Order
+   GET   /orders/                     — List Orders
+   GET   /orders/{id}                 — Get Order
+   PATCH /orders/{id}/status          — Update Order Status
+   POST  /orders/{id}/allocate        — Allocate Order
+   POST  /orders/{id}/auto-allocate   — Auto Allocate Order
    ============================================================ */
-export const Warehouses = {
-  getAll: ()        => getFirstSuccessful(['/warehouses/', '/warehouses']),
-  getById: (id)     => get(`/warehouses/${id}`),
-  getZones: (id)    => get(`/warehouses/${id}/zones`),
+export const Orders = {
+  create: (body) => post("/orders/", body),
+  getAll: (params = {}) => get("/orders/", params),
+  getById: (id) => get(`/orders/${id}`),
+  updateStatus: (id, status, notes, performedBy) =>
+    patch(`/orders/${id}/status`, {
+      status,
+      ...(notes && { notes }),
+      ...(performedBy && { performed_by: performedBy }),
+    }),
+  allocate: (id, warehouseId) =>
+    post(`/orders/${id}/allocate`, null, { warehouse_id: warehouseId }),
+  autoAllocate: (id) => post(`/orders/${id}/auto-allocate`),
 };
 
 /* ============================================================
    SHIPMENTS
+   POST  /shipments/                         — Create Shipment
+   GET   /shipments/                         — List Shipments
+   GET   /shipments/track/{tracking_number}  — Track Shipment
+   GET   /shipments/{id}                     — Get Shipment
+   PATCH /shipments/{id}/status              — Update Shipment Status
+   POST  /shipments/carriers                 — Create Carrier
+   GET   /shipments/carriers/list            — List Carriers
    ============================================================ */
 export const Shipments = {
-  getAll: (params = {})         => getFirstSuccessful(['/shipments/', '/shipments'], params),
-  track: (trackingNumber)       => get(`/shipments/track/${trackingNumber}`),
-  updateStatus: (id, status)    => patch(`/shipments/${id}/status`, { status }),
-  getCarriers: ()               => get('/shipments/carriers/list'),
+  create: (body) => post("/shipments/", body),
+  getAll: (params = {}) => get("/shipments/", params),
+  track: (trackingNumber) =>
+    get(`/shipments/track/${encodeURIComponent(trackingNumber)}`),
+  getById: (id) => get(`/shipments/${id}`),
+  updateStatus: (id, body) => patch(`/shipments/${id}/status`, body),
+  createCarrier: (body) => post("/shipments/carriers", body),
+  getCarriers: () => get("/shipments/carriers/list"),
+};
+
+/* ============================================================
+   FORECASTS
+   POST /forecasts/generate       — Generate Forecast
+   GET  /forecasts/{product_id}   — Get Forecasts
+   ============================================================ */
+export const Forecasts = {
+  generate: (body) => post("/forecasts/generate", body),
+  getByProduct: (productId, params = {}) =>
+    get(`/forecasts/${productId}`, params),
+};
+
+/* ============================================================
+   ANALYTICS
+   GET   /analytics/dashboard                      — Get Dashboard
+   GET   /analytics/warehouse/{warehouse_id}       — Get Warehouse Analytics
+   POST  /analytics/anomalies/detect               — Detect Anomalies
+   GET   /analytics/anomalies                      — List Anomalies
+   PATCH /analytics/anomalies/{alert_id}/resolve   — Resolve Anomaly
+   POST  /analytics/simulation/run                 — Run Simulation
+   ============================================================ */
+export const Analytics = {
+  getDashboard: () => get("/analytics/dashboard"),
+  getWarehouseAnalytics: (warehouseId) =>
+    get(`/analytics/warehouse/${warehouseId}`),
+  detectAnomalies: (windowDays = 7) =>
+    post("/analytics/anomalies/detect", null, { window_days: windowDays }),
+  getAnomalies: (params = {}) => get("/analytics/anomalies", params),
+  resolveAnomaly: (alertId, resolvedBy = "admin") =>
+    patch(`/analytics/anomalies/${alertId}/resolve`, null, {
+      resolved_by: resolvedBy,
+    }),
+  runSimulation: (body) => post("/analytics/simulation/run", body),
 };
 
 /* ============================================================
    UTILITY — Fetch with loading state management
    ============================================================ */
-
-/**
- * Wraps any API call with automatic loading/error UI.
- *
- * @param {Function} apiFn     — async function to call
- * @param {Object}   opts
- * @param {string}   opts.loadingEl  — selector for loading element to show/hide
- * @param {Function} opts.onSuccess  — callback(data)
- * @param {Function} opts.onError    — callback(error)  (optional)
- */
-export async function withLoading(apiFn, { loadingEl, onSuccess, onError } = {}) {
+export async function withLoading(
+  apiFn,
+  { loadingEl, onSuccess, onError } = {},
+) {
   const loader = loadingEl ? document.querySelector(loadingEl) : null;
-  if (loader) loader.classList.remove('hidden');
+  if (loader) loader.classList.remove("hidden");
 
   try {
     const data = await apiFn();
     if (onSuccess) onSuccess(data);
     return data;
   } catch (err) {
-    console.error('[API Error]', err);
-    if (onError) {
-      onError(err);
-    }
+    console.error("[API Error]", err);
+    if (onError) onError(err);
     return null;
   } finally {
-    if (loader) loader.classList.add('hidden');
+    if (loader) loader.classList.add("hidden");
   }
 }
 
