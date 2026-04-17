@@ -47,7 +47,13 @@ async function request(endpoint, options = {}) {
       let detail = `HTTP ${response.status}`;
       try {
         const errBody = await response.json();
-        detail = errBody.detail || errBody.message || detail;
+        const d = errBody.detail ?? errBody.message ?? detail;
+        detail =
+          typeof d === "string"
+            ? d
+            : Array.isArray(d)
+              ? d.map((e) => e.msg || JSON.stringify(e)).join("; ")
+              : JSON.stringify(d);
       } catch (_) {}
       throw new ApiError(`Request failed: ${detail}`, response.status, detail);
     }
@@ -243,26 +249,27 @@ export const Analytics = {
 };
 
 /* ============================================================
-   UTILITY — Fetch with loading state management
+   PAGINATED FETCH — fetch all records across pages
    ============================================================ */
-export async function withLoading(
-  apiFn,
-  { loadingEl, onSuccess, onError } = {},
-) {
-  const loader = loadingEl ? document.querySelector(loadingEl) : null;
-  if (loader) loader.classList.remove("hidden");
-
-  try {
-    const data = await apiFn();
-    if (onSuccess) onSuccess(data);
-    return data;
-  } catch (err) {
-    console.error("[API Error]", err);
-    if (onError) onError(err);
-    return null;
-  } finally {
-    if (loader) loader.classList.add("hidden");
+/**
+ * Fetch all records from a paginated list endpoint.
+ * Automatically pages through using offset/limit.
+ * @param {Function} apiFn — function(params) that returns a list
+ * @param {Object}   baseParams — extra query params
+ * @param {number}   pageSize — items per request (max 500)
+ * @returns {Promise<Array>}
+ */
+export async function fetchAll(apiFn, baseParams = {}, pageSize = 500) {
+  let all = [];
+  let offset = 0;
+  while (true) {
+    const batch = await apiFn({ ...baseParams, limit: pageSize, offset });
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    all = all.concat(batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
   }
+  return all;
 }
 
 export { ApiError };

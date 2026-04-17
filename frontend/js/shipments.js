@@ -1,674 +1,667 @@
 /**
- * shipments.js — Shipments Page Controller
- * Features: shipments table, live tracking by tracking number,
- * status timeline, filtering, status updates.
- * Auto-polls every 10 seconds.
+ * shipments.js — Shipments Controller
+ * Pipeline, split-view table + tracking detail, carrier metrics.
  */
-
-import { Shipments, Orders, Warehouses } from "./api.js";
+import { Shipments, Warehouses } from "./api.js";
 import {
   initShell,
-  markSyncing,
+  formatNumber,
+  formatCurrency,
   formatDate,
   formatDateTime,
-  formatNumber,
   statusBadge,
-  showPageLoader,
-  showError,
-  showEmpty,
   escapeHtml,
   toast,
-  sortBy,
+  timeAgo,
   debounce,
   paginate,
   renderPagination,
-  startPolling,
+  refreshIcons,
+  showPageLoader,
+  showError,
+  showEmpty,
+  sortBy,
 } from "./utils.js";
 
-/* ============================================================
-   STATE
-   ============================================================ */
-const state = {
-  shipments: [],
-  filtered: [],
-  carriers: {}, // carrier_id → { name, code, carrier_type }
-  sortKey: "created_at",
-  sortDir: "desc",
-  page: 1,
-  perPage: 20,
-  filters: {
-    search: "",
-    status: "",
-  },
-  tracking: null,
-};
+/* ── State ── */
+let shipments = [];
+let filtered = [];
+let carriers = [];
+let warehouses = [];
+let page = 1;
+const perPage = 20;
+let pipelineFilter = "";
+let selectedId = null;
+let searchTerm = "";
+let statusFilter = "";
+let carrierFilter = "";
+let carrierChart = null;
 
-const SHIPMENT_STATUSES = [
-  "pending",
-  "picked_up",
-  "in_transit",
-  "out_for_delivery",
-  "delivered",
-  "exception",
-  "returned",
+const STAGES = [
+  { key: "pending", label: "Pending", color: "var(--clr-gray-400)" },
+  { key: "picked_up", label: "Picked Up", color: "var(--clr-info)" },
+  { key: "in_transit", label: "In Transit", color: "var(--clr-warning)" },
+  { key: "out_for_delivery", label: "Out for Delivery", color: "#f97316" },
+  { key: "exception", label: "Exception", color: "var(--clr-danger)" },
+  { key: "delivered", label: "Delivered", color: "var(--clr-success)" },
+  { key: "returned", label: "Returned", color: "var(--clr-gray-400)" },
 ];
 
-/* ============================================================
-   INIT
-   ============================================================ */
+/* ── Init ── */
 document.addEventListener("DOMContentLoaded", async () => {
-  await initShell("shipments", "Shipments");
-  await loadCarriers();
-  await loadShipments();
-
-  bindFilterControls();
-  bindTrackingPanel();
-  bindCreateShipmentModal();
-  bindCreateCarrierModal();
-
-  startPolling(
-    "shipments",
-    async () => {
-      markSyncing();
-      await loadShipments(true);
-    },
-    10000,
-  );
+  await initShell("shipments");
+  bindEvents();
+  await loadAll();
 });
 
-/* ============================================================
-   LOAD CARRIERS (once)
-   ============================================================ */
-async function loadCarriers() {
-  try {
-    const data = await Shipments.getCarriers();
-    const list = Array.isArray(data) ? data : [];
-    for (const c of list) {
-      state.carriers[c.id] = {
-        name: c.name,
-        code: c.code,
-        carrier_type: c.carrier_type,
-      };
-    }
-  } catch (_) {
-    /* carriers are optional for display */
-  }
-}
+function bindEvents() {
+  const $ = (s) => document.querySelector(s);
 
-/* ============================================================
-   LOAD DATA
-   ============================================================ */
-async function loadShipments(silent = false) {
-  if (!silent) showPageLoader("shipments-table-container");
+  $("#btn-new-shipment").addEventListener("click", openCreateModal);
 
-  try {
-    const data = await Shipments.getAll();
-    state.shipments = Array.isArray(data)
-      ? data
-      : (data?.items ?? data?.shipments ?? []);
-  } catch (err) {
-    if (!silent) toast(`Failed to load shipments: ${err.message}`, "error");
-    state.shipments = [];
-  } finally {
+  $("#shipment-search")?.addEventListener(
+    "input",
+    debounce((e) => {
+      searchTerm = (e.target.value || "").trim().toLowerCase();
+      page = 1;
+      applyFilters();
+    }, 180),
+  );
+  $("#shipment-status-filter")?.addEventListener("change", (e) => {
+    statusFilter = e.target.value;
+    page = 1;
     applyFilters();
-  }
-}
-
-/* ============================================================
-   FILTERS
-   ============================================================ */
-function applyFilters() {
-  const { search, status } = state.filters;
-  const term = search.toLowerCase();
-
-  state.filtered = state.shipments.filter((s) => {
-    const tracking = (s.tracking_number ?? "").toLowerCase();
-    const carrierName = (
-      state.carriers[s.carrier_id]?.name ?? ""
-    ).toLowerCase();
-    const orderId = String(s.order_id ?? "").toLowerCase();
-
-    const matchSearch =
-      !term ||
-      tracking.includes(term) ||
-      carrierName.includes(term) ||
-      orderId.includes(term);
-
-    const matchStatus = !status || (s.status ?? "").toLowerCase() === status;
-    return matchSearch && matchStatus;
+  });
+  $("#shipment-carrier-filter")?.addEventListener("change", (e) => {
+    carrierFilter = e.target.value;
+    page = 1;
+    applyFilters();
   });
 
-  state.filtered = sortBy(state.filtered, state.sortKey, state.sortDir);
-  state.page = 1;
+  // Create modal
+  $("#create-modal-close").addEventListener("click", () =>
+    closeModal("create-modal"),
+  );
+  $("#create-modal-cancel").addEventListener("click", () =>
+    closeModal("create-modal"),
+  );
+  $("#create-modal-submit").addEventListener("click", submitCreate);
+
+  // Status modal
+  $("#status-modal-close").addEventListener("click", () =>
+    closeModal("status-modal"),
+  );
+  $("#status-modal-cancel").addEventListener("click", () =>
+    closeModal("status-modal"),
+  );
+  $("#status-modal-confirm").addEventListener("click", confirmStatusUpdate);
+
+  // Detail modal
+  $("#detail-modal-close").addEventListener("click", () =>
+    closeModal("detail-modal"),
+  );
+
+  document.querySelectorAll(".modal-backdrop").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      if (e.target === el) el.style.display = "none";
+    });
+  });
+}
+
+/* ── Data Loading ── */
+async function loadAll() {
+  showPageLoader("shipment-metrics");
+
+  try {
+    const [shipRes, carrierRes, whRes] = await Promise.allSettled([
+      Shipments.getAll({ limit: 200 }),
+      Shipments.getCarriers(),
+      Warehouses.getAll(),
+    ]);
+
+    shipments = shipRes.status === "fulfilled" ? shipRes.value : [];
+    carriers = carrierRes.status === "fulfilled" ? carrierRes.value : [];
+    warehouses = whRes.status === "fulfilled" ? whRes.value : [];
+
+    renderCarrierFilter();
+    renderMetrics();
+    applyFilters();
+    renderShipmentInsights();
+
+    const subtitle = document.getElementById("shipments-subtitle");
+    if (subtitle)
+      subtitle.textContent = `${formatNumber(shipments.length)} shipments across ${carriers.length} carriers`;
+  } catch (err) {
+    showError("shipment-metrics", err.message);
+  }
+}
+
+/* ── Metrics ── */
+function renderMetrics() {
+  const container = document.getElementById("shipment-metrics");
+  if (!container) return;
+
+  const inTransit = shipments.filter((s) =>
+    ["in_transit", "out_for_delivery"].includes(s.status),
+  ).length;
+  const delivered = shipments.filter((s) => s.status === "delivered").length;
+  const pending = shipments.filter((s) => s.status === "pending").length;
+  const avgCost =
+    shipments.length > 0
+      ? shipments.reduce((s, sh) => s + (sh.cost || 0), 0) / shipments.length
+      : 0;
+
+  const metrics = [
+    {
+      label: "Total Shipments",
+      value: formatNumber(shipments.length),
+      icon: "truck",
+    },
+    { label: "In Transit", value: formatNumber(inTransit), icon: "navigation" },
+    {
+      label: "Delivered",
+      value: formatNumber(delivered),
+      icon: "check-circle",
+    },
+    { label: "Avg Cost", value: formatCurrency(avgCost), icon: "indian-rupee" },
+  ];
+
+  container.innerHTML = metrics
+    .map(
+      (m) => `
+    <div class="metric-card">
+      <div class="metric-card__label"><i data-lucide="${m.icon}" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"></i>${m.label}</div>
+      <div class="metric-card__value">${m.value}</div>
+    </div>`,
+    )
+    .join("");
+  refreshIcons();
+}
+
+/* ── Filters ── */
+function applyFilters() {
+  filtered = shipments.filter((s) => {
+    if (pipelineFilter && s.status !== pipelineFilter) return false;
+    if (statusFilter && s.status !== statusFilter) return false;
+    if (carrierFilter && String(s.carrier_id) !== String(carrierFilter))
+      return false;
+
+    if (searchTerm) {
+      const haystack = [s.tracking_number, s.order_id, s.id, s.carrier_id]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(searchTerm)) return false;
+    }
+    return true;
+  });
+
+  filtered = sortBy(filtered, "created_at", "desc");
+  renderPipeline();
   renderTable();
-  renderShipmentKPIs();
+  renderShipmentInsights();
 }
 
-function renderShipmentKPIs() {
-  const total = state.shipments.length;
-  const inTransit = state.shipments.filter(
-    (s) => s.status === "in_transit",
-  ).length;
-  const delayed = state.shipments.filter(
-    (s) => s.status === "exception",
-  ).length;
-  const delivered = state.shipments.filter(
-    (s) => s.status === "delivered",
-  ).length;
+function renderCarrierFilter() {
+  const carrierSelect = document.getElementById("shipment-carrier-filter");
+  if (!carrierSelect) return;
 
-  const setStat = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-  };
-  setStat("stat-total-shipments", total);
-  setStat("stat-in-transit", inTransit);
-  setStat("stat-delayed", delayed);
-  setStat("stat-delivered", delivered);
+  carrierSelect.innerHTML =
+    '<option value="">All Carriers</option>' +
+    carriers
+      .map(
+        (carrier) =>
+          `<option value="${carrier.id}">${escapeHtml(
+            carrier.name || String(carrier.id),
+          )}</option>`,
+      )
+      .join("");
 }
 
-/* ============================================================
-   RENDER TABLE
-   ============================================================ */
+function renderShipmentInsights() {
+  renderCarrierChart();
+  renderDeliveryHealth();
+}
+
+function renderCarrierChart() {
+  const wrap = document.getElementById("carrier-chart-wrap");
+  if (!wrap) return;
+
+  let canvas = document.getElementById("carrier-chart");
+  if (!canvas) {
+    wrap.innerHTML = '<canvas id="carrier-chart"></canvas>';
+    canvas = document.getElementById("carrier-chart");
+  }
+
+  if (carrierChart) {
+    carrierChart.destroy();
+    carrierChart = null;
+  }
+
+  const hasActiveFilters = Boolean(
+    searchTerm || statusFilter || pipelineFilter || carrierFilter,
+  );
+  const list = hasActiveFilters ? filtered : shipments;
+  if (
+    !Array.isArray(list) ||
+    list.length === 0 ||
+    typeof Chart === "undefined"
+  ) {
+    wrap.innerHTML = `<div class="empty-state" style="padding:1.5rem"><div class="empty-state__title">No shipment data</div></div>`;
+    return;
+  }
+
+  const counts = new Map();
+  list.forEach((shipment) => {
+    const carrierName =
+      carriers.find(
+        (carrier) => String(carrier.id) === String(shipment.carrier_id),
+      )?.name || String(shipment.carrier_id || "Unassigned");
+    counts.set(carrierName, (counts.get(carrierName) || 0) + 1);
+  });
+
+  const labels = [...counts.keys()];
+  const values = [...counts.values()];
+
+  carrierChart = new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels,
+      datasets: [
+        {
+          data: values,
+          borderWidth: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "62%",
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            boxWidth: 10,
+            font: { family: "'Inter', sans-serif", size: 12 },
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderDeliveryHealth() {
+  const container = document.getElementById("shipment-health");
+  if (!container) return;
+
+  const hasActiveFilters = Boolean(
+    searchTerm || statusFilter || pipelineFilter || carrierFilter,
+  );
+  const list = hasActiveFilters ? filtered : shipments;
+  if (!Array.isArray(list) || list.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:1.5rem"><div class="empty-state__title">No data</div></div>`;
+    return;
+  }
+
+  const total = list.length || 1;
+  const delivered = list.filter((s) => s.status === "delivered").length;
+  const inTransit = list.filter((s) =>
+    ["picked_up", "in_transit", "out_for_delivery"].includes(s.status),
+  ).length;
+  const exception = list.filter((s) =>
+    ["exception", "returned"].includes(s.status),
+  ).length;
+  const pending = list.filter((s) => s.status === "pending").length;
+
+  const rows = [
+    { label: "Delivered", value: delivered, tone: "success" },
+    { label: "In Transit", value: inTransit, tone: "info" },
+    { label: "Pending", value: pending, tone: "warning" },
+    { label: "Exceptions", value: exception, tone: "danger" },
+  ];
+
+  container.innerHTML = `<div class="progress-list">${rows
+    .map((row) => {
+      const pct = Math.round((row.value / total) * 100);
+      const tone = row.tone === "info" ? "warning" : row.tone;
+      return `<div class="progress-list__item">
+        <div class="progress-list__label">${row.label}</div>
+        <div class="progress-bar" style="height:7px"><div class="progress-bar__fill progress-bar__fill--${tone}" style="width:${pct}%"></div></div>
+        <div class="progress-list__value">${pct}%</div>
+      </div>`;
+    })
+    .join("")}</div>`;
+}
+
+/* ── Pipeline ── */
+function renderPipeline() {
+  const container = document.getElementById("shipment-pipeline");
+  if (!container) return;
+
+  const counts = {};
+  STAGES.forEach((s) => (counts[s.key] = 0));
+  shipments.forEach((s) => {
+    const st = (s.status || "").toLowerCase();
+    if (counts[st] !== undefined) counts[st]++;
+  });
+
+  const total = shipments.length || 1;
+  const arrow = `<div class="pipeline__connector"><i data-lucide="chevron-right"></i></div>`;
+
+  container.innerHTML = `<div class="pipeline">${STAGES.map((s, i) => {
+    const count = counts[s.key];
+    const pct = Math.round((count / total) * 100);
+    const active = pipelineFilter === s.key ? " active" : "";
+    return (
+      (i > 0 ? arrow : "") +
+      `
+      <div class="pipeline__stage${active}" data-stage="${s.key}" style="cursor:pointer">
+        <div class="pipeline__stage-count" style="color:${s.color}">${count}</div>
+        <div class="pipeline__stage-label">${s.label}</div>
+        <div class="pipeline__stage-bar">
+          <div class="pipeline__stage-bar-fill" style="width:${pct}%;background:${s.color}"></div>
+        </div>
+      </div>`
+    );
+  }).join("")}</div>`;
+
+  container.querySelectorAll(".pipeline__stage").forEach((el) => {
+    el.addEventListener("click", () => {
+      const stage = el.dataset.stage;
+      pipelineFilter = pipelineFilter === stage ? "" : stage;
+      page = 1;
+      applyFilters();
+    });
+  });
+  refreshIcons();
+}
+
+/* ── Table ── */
 function renderTable() {
   const container = document.getElementById("shipments-table-container");
   if (!container) return;
 
-  if (state.filtered.length === 0) {
-    showEmpty(
-      "shipments-table-container",
-      "No shipments found",
-      "Try adjusting your filters.",
-    );
-    document.getElementById("shipments-pagination")?.replaceChildren();
+  const paging = paginate(filtered, page, perPage);
+  const { items } = paging;
+
+  if (items.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:3rem"><div class="empty-state__icon"><i data-lucide="truck"></i></div><div class="empty-state__title">No shipments found</div></div>`;
+    document.getElementById("shipments-pagination").innerHTML = "";
+    refreshIcons();
     return;
   }
 
-  const { items, ...pagination } = paginate(
-    state.filtered,
-    state.page,
-    state.perPage,
-  );
-
   container.innerHTML = `
-    <div class="table-wrapper">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Tracking #</th>
-            <th>Order ID</th>
-            <th>Carrier</th>
-            <th class="sortable ${state.sortKey === "status" ? "sorted" : ""}" data-key="status"
-              style="cursor:pointer">Status ${state.sortKey === "status" ? (state.sortDir === "asc" ? "↑" : "↓") : "↕"}</th>
-            <th>Est. Delivery</th>
-            <th class="sortable ${state.sortKey === "created_at" ? "sorted" : ""}" data-key="created_at"
-              style="cursor:pointer">Shipped On ${state.sortKey === "created_at" ? (state.sortDir === "asc" ? "↑" : "↓") : "↕"}</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${items.map((s) => shipmentRowHTML(s)).join("")}
-        </tbody>
-      </table>
-    </div>`;
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Tracking</th>
+          <th>Order</th>
+          <th>Carrier</th>
+          <th>Status</th>
+          <th>Weight</th>
+          <th>Cost</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>${items
+        .map((s) => {
+          const isSelected = String(s.id) === String(selectedId);
+          const carrierName =
+            carriers.find((c) => String(c.id) === String(s.carrier_id))?.name ||
+            String(s.carrier_id || "—");
+          return `
+          <tr class="shipment-row${isSelected ? " row--highlight" : ""}" data-id="${s.id}" style="cursor:pointer">
+            <td><span class="table__id">${escapeHtml(s.tracking_number || String(s.id))}</span></td>
+            <td class="text-muted">${escapeHtml(String(s.order_id || "—"))}</td>
+            <td>${escapeHtml(carrierName)}</td>
+            <td>${statusBadge(s.status)}</td>
+            <td class="text-muted">${s.weight_kg ? s.weight_kg + " kg" : "—"}</td>
+            <td>${s.cost ? formatCurrency(s.cost) : "—"}</td>
+            <td class="text-muted">${timeAgo(s.created_at)}</td>
+            <td class="table__actions">
+              <button class="btn btn--ghost btn--sm" title="Update status" data-action="status" data-id="${s.id}"><i data-lucide="refresh-cw" style="width:14px;height:14px"></i></button>
+            </td>
+          </tr>`;
+        })
+        .join("")}
+      </tbody>
+    </table>`;
 
-  // Sort
-  container.querySelectorAll("th.sortable").forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.key;
-      if (state.sortKey === key)
-        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-      else {
-        state.sortKey = key;
-        state.sortDir = "asc";
-      }
-      applyFilters();
+  // Row click → detail
+  container.querySelectorAll(".shipment-row").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("[data-action]")) return;
+      loadDetail(row.dataset.id);
     });
   });
 
-  // Track button
-  container.querySelectorAll(".btn-track").forEach((btn) => {
-    btn.addEventListener("click", () => trackShipment(btn.dataset.tracking));
+  // Status action
+  container.querySelectorAll("[data-action='status']").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openStatusModal(btn.dataset.id);
+    });
   });
 
-  // Update status
-  container.querySelectorAll(".btn-update-shipment").forEach((btn) => {
-    btn.addEventListener("click", () =>
-      openStatusModal(btn.dataset.id, btn.dataset.status),
-    );
-  });
-
-  renderPagination("shipments-pagination", pagination, (p) => {
-    state.page = p;
+  renderPagination("shipments-pagination", paging, (p) => {
+    page = p;
     renderTable();
   });
+  refreshIcons();
 }
 
-function shipmentRowHTML(s) {
-  const tracking = s.tracking_number ?? "—";
-  const orderId = s.order_id ?? "—";
-  const carrierInfo = state.carriers[s.carrier_id];
-  const carrierName = carrierInfo?.name ?? "—";
-  const carrierType = carrierInfo?.carrier_type ?? "";
-  const status = s.status ?? "pending";
-  const estDelivery = s.estimated_delivery;
-  const shippedOn = s.shipped_at ?? s.created_at;
-  const isDelayed = status === "exception";
+/* ── Detail Modal ── */
+async function loadDetail(id) {
+  selectedId = id;
+  renderTable(); // Highlight row
 
-  return `
-    <tr style="${isDelayed ? "background:var(--clr-danger-light)" : ""}">
-      <td>
-        <div style="display:flex;align-items:center;gap:.5rem">
-          <span class="table__id">${escapeHtml(tracking)}</span>
-          ${isDelayed ? `<span class="badge badge--critical badge--dot" style="font-size:.625rem">Exception</span>` : ""}
-        </div>
-      </td>
-      <td><span class="table__id">${escapeHtml(String(orderId).slice(0, 8))}…</span></td>
-      <td>
-        <div style="font-weight:500">${escapeHtml(carrierName)}</div>
-        ${carrierType ? `<div class="text-xs text-muted">${escapeHtml(carrierType)}</div>` : ""}
-      </td>
-      <td>${statusBadge(status)}</td>
-      <td class="${isDelayed ? "text-danger font-semibold" : "text-muted"}">
-        ${estDelivery ? formatDate(estDelivery) : "—"}
-      </td>
-      <td class="text-muted">${formatDate(shippedOn)}</td>
-      <td>
-        <div class="table__actions">
-          <button class="btn btn--secondary btn--sm btn-track"
-            data-tracking="${escapeHtml(tracking)}"
-            title="Track shipment">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6
-                3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-            </svg>
-            Track
-          </button>
-          <button class="btn btn--ghost btn--sm btn-update-shipment"
-            data-id="${escapeHtml(String(s.id ?? s.shipment_id ?? ""))}"
-            data-status="${escapeHtml(status)}"
-            title="Update status">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0
-                112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-            </svg>
-          </button>
-        </div>
-      </td>
-    </tr>`;
-}
-
-/* ============================================================
-   TRACKING PANEL
-   ============================================================ */
-function bindTrackingPanel() {
-  const input = document.getElementById("tracking-input");
-  const btn = document.getElementById("track-btn");
-  const panel = document.getElementById("tracking-result");
-
-  if (btn) {
-    btn.addEventListener("click", async () => {
-      const num = input?.value?.trim();
-      if (!num) {
-        toast("Enter a tracking number", "warning");
-        return;
-      }
-      await trackShipment(num);
-    });
-  }
-
-  if (input) {
-    input.addEventListener("keydown", async (e) => {
-      if (e.key === "Enter") {
-        const num = input.value?.trim();
-        if (num) await trackShipment(num);
-      }
-    });
-  }
-}
-
-async function trackShipment(trackingNumber) {
-  if (!trackingNumber || trackingNumber === "—") return;
-
-  const panel = document.getElementById("tracking-result");
-  const input = document.getElementById("tracking-input");
-
-  if (input && !input.value) input.value = trackingNumber;
-  if (!panel) return;
-
-  panel.innerHTML =
-    '<div class="page-loading"><div class="spinner"></div><span>Fetching tracking info…</span></div>';
-  panel.classList.remove("hidden");
+  const modal = document.getElementById("detail-modal");
+  const body = document.getElementById("detail-modal-body");
+  const title = document.getElementById("detail-modal-title");
+  if (title) title.textContent = `Shipment ${id}`;
+  body.innerHTML = `<div class="spinner" style="margin:2rem auto"></div>`;
+  modal.style.display = "flex";
 
   try {
-    const data = await Shipments.track(trackingNumber);
-    state.tracking = data;
-    renderTrackingResult(panel, data);
-  } catch (err) {
-    panel.innerHTML = `
-      <div class="alert alert--danger">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-        <span>Tracking not found: <strong>${escapeHtml(trackingNumber)}</strong>. ${escapeHtml(err.message)}</span>
-      </div>`;
-  }
-}
+    const ship = await Shipments.getById(id);
+    const events = ship.events || [];
+    const carrierName =
+      carriers.find((c) => String(c.id) === String(ship.carrier_id))?.name ||
+      String(ship.carrier_id || "—");
+    const originWh = ship.origin_warehouse_id
+      ? warehouses.find(
+          (w) => String(w.id) === String(ship.origin_warehouse_id),
+        )?.name || `WH-${ship.origin_warehouse_id}`
+      : "—";
 
-function renderTrackingResult(container, data) {
-  if (!data) {
-    container.innerHTML =
-      '<div class="empty-state__title">No tracking data found</div>';
-    return;
-  }
+    // Tracking stepper — proper horizontal connector layout
+    const stageOrder = STAGES.map((s) => s.key);
+    const currentIdx = stageOrder.indexOf((ship.status || "").toLowerCase());
 
-  const tracking = data.tracking_number ?? "—";
-  const carrierInfo = state.carriers[data.carrier_id];
-  const carrierName = carrierInfo?.name ?? "—";
-  const status = data.status ?? "unknown";
-  const events = data.events ?? [];
-
-  container.innerHTML = `
-    <div class="card">
-      <div class="card__header">
-        <div>
-          <div class="card__title">Tracking: ${escapeHtml(tracking)}</div>
-          <div class="card__subtitle">${escapeHtml(carrierName)}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:.5rem">
-          ${statusBadge(status)}
-          <button class="btn btn--ghost btn--sm" id="close-tracking">✕</button>
-        </div>
-      </div>
-      <div class="card__body">
-        ${
-          events.length > 0
-            ? timelineHTML(events)
-            : `
-          <div class="stat-row">
-            <span class="stat-row__label">Status</span>
-            <span class="stat-row__value">${statusBadge(status)}</span>
+    const stepperHtml = `<div class="tracking-stepper">
+      ${stageOrder
+        .map((stage, i) => {
+          const isCompleted = i < currentIdx;
+          const isCurrent = i === currentIdx;
+          const stepCls = isCurrent
+            ? "current"
+            : isCompleted
+              ? "completed"
+              : "";
+          const label = STAGES.find((s) => s.key === stage)?.label || stage;
+          const hasConnector = i < stageOrder.length - 1;
+          return `<div class="tracking-stepper__step ${stepCls}">
+          <div class="tracking-stepper__top">
+            <div class="tracking-stepper__dot"></div>
+            ${hasConnector ? `<div class="tracking-stepper__connector ${isCompleted ? "tracking-stepper__connector--done" : ""}"></div>` : ""}
           </div>
-          <div class="stat-row">
-            <span class="stat-row__label">Est. Delivery</span>
-            <span class="stat-row__value">${formatDate(data.estimated_delivery)}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-row__label">Shipped At</span>
-            <span class="stat-row__value">${formatDateTime(data.shipped_at)}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-row__label">Weight</span>
-            <span class="stat-row__value">${data.weight_kg ? data.weight_kg + " kg" : "—"}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-row__label">Cost</span>
-            <span class="stat-row__value">${data.cost ? "$" + formatNumber(data.cost, 2) : "—"}</span>
-          </div>`
-        }
-      </div>
-    </div>`;
-
-  container.querySelector("#close-tracking")?.addEventListener("click", () => {
-    container.innerHTML = "";
-    container.classList.add("hidden");
-    const input = document.getElementById("tracking-input");
-    if (input) input.value = "";
-  });
-}
-
-function timelineHTML(events) {
-  return `
-    <div class="timeline">
-      ${events
-        .map((ev, idx) => {
-          const isFirst = idx === 0;
-          const status = ev.status ?? ev.event ?? "update";
-          const time = ev.timestamp ?? ev.date ?? ev.time;
-          const location = ev.location ?? ev.city ?? "";
-          return `
-          <div class="timeline__item">
-            <div class="timeline__dot ${isFirst ? "current" : "completed"}">
-              ${
-                isFirst
-                  ? `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 12l2 2 4-4"/>
-                   </svg>`
-                  : ""
-              }
-            </div>
-            <div class="timeline__title">${escapeHtml(String(status).replace(/_/g, " "))}</div>
-            ${location ? `<div class="timeline__time">${escapeHtml(location)}</div>` : ""}
-            <div class="timeline__time">${formatDateTime(time)}</div>
-          </div>`;
+          <div class="tracking-stepper__label">${label}</div>
+        </div>`;
         })
         .join("")}
     </div>`;
-}
 
-/* ============================================================
-   STATUS UPDATE MODAL
-   ============================================================ */
-let _currentShipmentId = null;
+    // Detail info rows
+    const fields = [
+      {
+        label: "Tracking No.",
+        value: escapeHtml(ship.tracking_number || "—"),
+        mono: true,
+      },
+      { label: "Order ID", value: escapeHtml(String(ship.order_id || "—")) },
+      { label: "Carrier", value: escapeHtml(carrierName) },
+      { label: "Status", value: statusBadge(ship.status) },
+      { label: "Origin Warehouse", value: escapeHtml(originWh) },
+      { label: "Weight", value: ship.weight_kg ? `${ship.weight_kg} kg` : "—" },
+      { label: "Cost", value: ship.cost ? formatCurrency(ship.cost) : "—" },
+      {
+        label: "Created",
+        value: ship.created_at ? formatDateTime(ship.created_at) : "—",
+      },
+      ...(ship.estimated_delivery_date
+        ? [
+            {
+              label: "Est. Delivery",
+              value: formatDate(ship.estimated_delivery_date),
+            },
+          ]
+        : []),
+    ];
 
-function openStatusModal(shipmentId, currentStatus) {
-  _currentShipmentId = shipmentId;
-  const modal = document.getElementById("shipment-status-modal");
-  const idEl = document.getElementById("ship-modal-id");
-  const curEl = document.getElementById("ship-modal-current");
-  const select = document.getElementById("ship-modal-status");
+    body.innerHTML = `
+      ${stepperHtml}
 
-  if (idEl) idEl.textContent = `#${shipmentId}`;
-  if (curEl) curEl.innerHTML = statusBadge(currentStatus);
-  if (select) {
-    select.innerHTML = SHIPMENT_STATUSES.map(
-      (s) =>
-        `<option value="${s}" ${s === currentStatus ? "selected" : ""}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`,
-    ).join("");
+      <div class="ship-detail-section">
+        <div class="ship-detail-label-row">
+          <i data-lucide="info" style="width:13px;height:13px"></i> Shipment Details
+        </div>
+        <div class="detail-grid" style="margin-top:0.5rem">
+          ${fields
+            .map(
+              (f) => `
+            <div class="detail-grid__item">
+              <span class="detail-grid__label">${f.label}</span>
+              <span class="detail-grid__value${f.mono ? " font-mono" : ""}">${f.value}</span>
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>
+
+      ${
+        events.length > 0
+          ? `
+      <div class="ship-detail-section">
+        <div class="ship-detail-label-row">
+          <i data-lucide="map-pin" style="width:13px;height:13px"></i> Tracking Events
+        </div>
+        <ul class="timeline" style="margin-top:0.5rem">
+          ${events
+            .map(
+              (ev) => `
+            <li class="timeline__item">
+              <div class="timeline__dot"></div>
+              <div class="timeline__content">
+                <strong>${escapeHtml(ev.status || ev.event || "—")}</strong>
+                <div class="text-xs text-muted">${formatDateTime(ev.timestamp || ev.created_at)}</div>
+                ${ev.location ? `<div class="text-xs text-muted"><i data-lucide="map-pin" style="width:10px;height:10px;vertical-align:-1px"></i> ${escapeHtml(ev.location)}</div>` : ""}
+              </div>
+            </li>`,
+            )
+            .join("")}
+        </ul>
+      </div>`
+          : ""
+      }
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><div class="empty-state__title">Failed to load</div><div class="empty-state__description">${escapeHtml(err.message)}</div></div>`;
   }
-  modal?.classList.add("active");
+  refreshIcons();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  document
-    .getElementById("ship-modal-cancel")
-    ?.addEventListener("click", closeShipmentModal);
-  document
-    .getElementById("shipment-status-modal")
-    ?.addEventListener("click", (e) => {
-      if (e.target === e.currentTarget) closeShipmentModal();
-    });
+/* ── Status Update ── */
+let statusShipmentId = null;
 
-  document
-    .getElementById("ship-modal-confirm")
-    ?.addEventListener("click", async () => {
-      const select = document.getElementById("ship-modal-status");
-      const newStatus = select?.value;
-      if (!newStatus || !_currentShipmentId) return;
-
-      const btn = document.getElementById("ship-modal-confirm");
-      btn.disabled = true;
-      btn.innerHTML =
-        '<div class="spinner spinner--sm spinner--white"></div> Saving…';
-
-      try {
-        await Shipments.updateStatus(_currentShipmentId, { status: newStatus });
-
-        const shipment = state.shipments.find(
-          (s) => String(s.id) === String(_currentShipmentId),
-        );
-        if (shipment) shipment.status = newStatus;
-
-        toast(
-          `Shipment #${_currentShipmentId} updated to "${newStatus}"`,
-          "success",
-        );
-        closeShipmentModal();
-        applyFilters();
-      } catch (err) {
-        toast(`Failed to update: ${err.message}`, "error");
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = "Save";
-      }
-    });
-});
-
-function closeShipmentModal() {
-  document.getElementById("shipment-status-modal")?.classList.remove("active");
-  _currentShipmentId = null;
+function openStatusModal(id) {
+  const ship = shipments.find((s) => String(s.id) === String(id));
+  if (!ship) return;
+  statusShipmentId = id;
+  document.getElementById("status-modal-info").textContent =
+    `Shipment ${ship.tracking_number || id} — currently "${ship.status}"`;
+  document.getElementById("status-modal-select").value = ship.status;
+  document.getElementById("status-modal").style.display = "flex";
+  refreshIcons();
 }
 
-/* ============================================================
-   FILTER CONTROLS
-   ============================================================ */
-function bindFilterControls() {
-  const search = document.getElementById("search-shipments");
-  const status = document.getElementById("filter-ship-status");
-
-  if (search) {
-    search.addEventListener(
-      "input",
-      debounce((e) => {
-        state.filters.search = e.target.value;
-        applyFilters();
-      }, 300),
-    );
-  }
-
-  if (status) {
-    status.addEventListener("change", (e) => {
-      state.filters.status = e.target.value;
-      applyFilters();
-    });
+async function confirmStatusUpdate() {
+  const newStatus = document.getElementById("status-modal-select").value;
+  try {
+    await Shipments.updateStatus(statusShipmentId, { status: newStatus });
+    toast("Status updated", "success");
+    closeModal("status-modal");
+    await loadAll();
+  } catch (err) {
+    toast(err.message, "error");
   }
 }
 
-/* ============================================================
-   CREATE SHIPMENT MODAL
-   ============================================================ */
-function bindCreateShipmentModal() {
-  const openBtn = document.getElementById("create-shipment-btn");
-  const modal = document.getElementById("create-shipment-modal");
-  if (!openBtn || !modal) return;
+/* ── Create Shipment ── */
+function openCreateModal() {
+  // Populate dropdowns
+  const carrierSel = document.getElementById("create-carrier");
+  carrierSel.innerHTML =
+    `<option value="">Select carrier</option>` +
+    carriers
+      .map(
+        (c) =>
+          `<option value="${c.id}">${escapeHtml(c.name || `Carrier ${c.id}`)}</option>`,
+      )
+      .join("");
 
-  const closeModal = () => modal.classList.remove("active");
-  openBtn.addEventListener("click", async () => {
-    // Populate carrier select
-    const sel = document.getElementById("shipment-carrier");
-    if (sel) {
-      sel.innerHTML =
-        '<option value="">Select carrier</option>' +
-        Object.entries(state.carriers)
-          .map(
-            ([id, c]) =>
-              `<option value="${id}">${escapeHtml(c.name || c.code || id)}</option>`,
-          )
-          .join("");
-    }
-    modal.classList.add("active");
-  });
+  const whSel = document.getElementById("create-warehouse");
+  whSel.innerHTML =
+    `<option value="">Select warehouse</option>` +
+    warehouses
+      .map(
+        (w) =>
+          `<option value="${w.id}">${escapeHtml(w.name || `WH ${w.id}`)}</option>`,
+      )
+      .join("");
 
-  document
-    .getElementById("create-shipment-cancel")
-    ?.addEventListener("click", closeModal);
-  document
-    .getElementById("create-shipment-cancel-footer")
-    ?.addEventListener("click", closeModal);
-  modal.addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) closeModal();
-  });
-
-  document
-    .getElementById("create-shipment-submit")
-    ?.addEventListener("click", async () => {
-      const orderId = document
-        .getElementById("shipment-order-id")
-        ?.value?.trim();
-      const carrierId = document.getElementById("shipment-carrier")?.value;
-      const serviceType = document
-        .getElementById("shipment-service")
-        ?.value?.trim();
-
-      if (!orderId) {
-        toast("Order ID is required", "warning");
-        return;
-      }
-
-      const submitBtn = document.getElementById("create-shipment-submit");
-      submitBtn.disabled = true;
-      submitBtn.innerHTML =
-        '<div class="spinner spinner--sm spinner--white"></div>';
-
-      try {
-        const body = {
-          order_id: orderId,
-          ...(carrierId && { carrier_id: carrierId }),
-          ...(serviceType && { service_type: serviceType }),
-        };
-        await Shipments.create(body);
-        toast("Shipment created successfully", "success");
-        closeModal();
-        await loadShipments();
-      } catch (err) {
-        toast(`Failed: ${err.message}`, "error");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Create Shipment";
-      }
-    });
+  document.getElementById("create-order").value = "";
+  document.getElementById("create-modal").style.display = "flex";
+  refreshIcons();
 }
 
-/* ============================================================
-   CREATE CARRIER MODAL
-   ============================================================ */
-function bindCreateCarrierModal() {
-  const openBtn = document.getElementById("create-carrier-btn");
-  const modal = document.getElementById("create-carrier-modal");
-  if (!openBtn || !modal) return;
+async function submitCreate() {
+  const orderId = document.getElementById("create-order").value.trim();
+  const carrierId = document.getElementById("create-carrier").value;
+  const warehouseId = document.getElementById("create-warehouse").value;
 
-  const closeModal = () => modal.classList.remove("active");
-  openBtn.addEventListener("click", () => modal.classList.add("active"));
-  document
-    .getElementById("create-carrier-cancel")
-    ?.addEventListener("click", closeModal);
-  document
-    .getElementById("create-carrier-cancel-footer")
-    ?.addEventListener("click", closeModal);
-  modal.addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) closeModal();
-  });
+  if (!orderId) {
+    toast("Order ID is required", "error");
+    return;
+  }
 
-  document
-    .getElementById("create-carrier-submit")
-    ?.addEventListener("click", async () => {
-      const name = document.getElementById("carrier-name")?.value?.trim();
-      const code = document.getElementById("carrier-code")?.value?.trim();
-      const carrierType = document.getElementById("carrier-type")?.value;
+  const payload = { order_id: orderId };
+  if (carrierId) payload.carrier_id = carrierId;
+  if (warehouseId) payload.origin_warehouse_id = warehouseId;
 
-      if (!name || !code) {
-        toast("Name and code are required", "warning");
-        return;
-      }
+  try {
+    await Shipments.create(payload);
+    toast("Shipment created", "success");
+    closeModal("create-modal");
+    await loadAll();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
 
-      const submitBtn = document.getElementById("create-carrier-submit");
-      submitBtn.disabled = true;
-
-      try {
-        await Shipments.createCarrier({
-          name,
-          code,
-          carrier_type: carrierType || "standard",
-        });
-        toast("Carrier created successfully", "success");
-        closeModal();
-        await loadCarriers();
-      } catch (err) {
-        toast(`Failed: ${err.message}`, "error");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Create Carrier";
-      }
-    });
+/* ── Helpers ── */
+function closeModal(id) {
+  document.getElementById(id).style.display = "none";
 }

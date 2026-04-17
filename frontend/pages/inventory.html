@@ -4,231 +4,113 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inventory — SCM Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="../css/global.css" />
     <link rel="stylesheet" href="../css/layout.css" />
     <link rel="stylesheet" href="../css/components.css" />
-    <style>
-      /* Inline tab styles */
-      .tab-bar {
-        display: flex;
-        gap: 0;
-        border-bottom: 2px solid var(--clr-border);
-        margin-bottom: 1rem;
-      }
-
-      .tab-btn {
-        padding: 0.625rem 1.25rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: var(--clr-text-secondary);
-        background: none;
-        border: none;
-        cursor: pointer;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -2px;
-        transition: all var(--transition-fast);
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-      }
-
-      .tab-btn:hover {
-        color: var(--clr-text);
-      }
-
-      .tab-btn.active {
-        color: var(--clr-primary);
-        border-bottom-color: var(--clr-primary);
-        font-weight: 600;
-      }
-
-      .tab-btn .tab-badge {
-        background: var(--clr-danger);
-        color: white;
-        font-size: 0.625rem;
-        font-weight: 700;
-        padding: 0.125rem 0.375rem;
-        border-radius: 99px;
-        min-width: 18px;
-        text-align: center;
-      }
-
-      .warehouse-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1rem;
-      }
-    </style>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   </head>
   <body>
     <div class="app-shell">
       <div id="sidebar-container"></div>
-
-      <div style="flex: 1; min-width: 0">
-        <div id="navbar-container"></div>
-
-        <main class="main-content">
-          <!-- Page Header -->
-          <div class="page-header">
-            <div class="page-header__left">
-              <h1 class="page-header__title">Inventory</h1>
-              <p class="page-header__subtitle">
-                Real-time stock levels, movements & alerts
-              </p>
-            </div>
-            <div class="page-header__actions">
-              <button class="btn btn--primary btn--sm" id="receive-stock-btn">
-                Receive Stock
-              </button>
-              <button
-                class="btn btn--secondary btn--sm"
-                id="transfer-stock-btn"
-              >
-                Transfer
-              </button>
-              <button class="btn btn--secondary btn--sm" id="adjust-stock-btn">
-                Adjust
-              </button>
-              <span
-                class="badge badge--info"
-                style="font-size: 0.75rem; padding: 0.375rem 0.75rem"
-              >
-                Auto-refresh 10s
-              </span>
-            </div>
+      <main class="main-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-header__title">Inventory</h1>
+            <p class="page-header__subtitle" id="inv-subtitle">Loading…</p>
           </div>
+          <div class="page-header__actions">
+            <button class="btn btn--secondary" id="btn-receive">
+              <i
+                data-lucide="package-plus"
+                style="width: 16px; height: 16px"
+              ></i>
+              Receive
+            </button>
+            <button class="btn btn--secondary" id="btn-transfer">
+              <i
+                data-lucide="arrow-right-left"
+                style="width: 16px; height: 16px"
+              ></i>
+              Transfer
+            </button>
+            <button class="btn btn--secondary" id="btn-adjust">
+              <i data-lucide="sliders" style="width: 16px; height: 16px"></i>
+              Adjust
+            </button>
+          </div>
+        </div>
 
-          <!-- Toolbar -->
+        <!-- Analytics Metrics -->
+        <div class="metric-row" id="inv-metrics">
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar" id="inv-tabs">
+          <button class="tab-bar__item active" data-tab="stock">
+            Stock Levels
+          </button>
+          <button class="tab-bar__item" data-tab="movements">Movements</button>
+          <button class="tab-bar__item" data-tab="lowstock">
+            Low Stock <span class="tab-count" id="lowstock-count"></span>
+          </button>
+        </div>
+
+        <!-- Stock Tab -->
+        <div class="tab-panel active" id="tab-stock">
           <div class="toolbar">
             <div class="toolbar__search">
-              <svg
-                class="toolbar__search-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+              <i data-lucide="search"></i>
               <input
-                type="search"
-                class="toolbar__search-input"
-                id="search-inventory"
-                placeholder="Search by SKU, product name…"
-                autocomplete="off"
+                type="text"
+                class="form-input"
+                id="stock-search"
+                placeholder="Search products…"
               />
             </div>
-            <div class="toolbar__sep"></div>
-            <div class="toolbar__filter-group">
-              <span class="toolbar__filter-label">Warehouse:</span>
-              <select class="toolbar__select" id="filter-inv-warehouse">
-                <option value="">All Warehouses</option>
-              </select>
-            </div>
+            <select class="form-select" id="stock-warehouse-filter">
+              <option value="">All warehouses</option>
+            </select>
           </div>
+          <div class="table-wrapper" id="stock-table-container"></div>
+          <div id="stock-pagination"></div>
+        </div>
 
-          <!-- Tabs -->
-          <div class="tab-bar">
-            <button class="tab-btn active" data-tab="stock">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                style="width: 15px; height: 15px"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
-              Stock Levels
-            </button>
-            <button class="tab-btn" data-tab="movements">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                style="width: 15px; height: 15px"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                />
-              </svg>
-              Movements
-            </button>
-            <button class="tab-btn" data-tab="alerts">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                style="width: 15px; height: 15px"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                />
-              </svg>
-              Low Stock Alerts
-              <span class="tab-badge" id="low-stock-badge" style="display: none"
-                >0</span
-              >
-            </button>
-          </div>
+        <!-- Movements Tab -->
+        <div class="tab-panel" id="tab-movements" style="display: none">
+          <div id="movements-container"></div>
+          <div id="movements-pagination"></div>
+        </div>
 
-          <!-- Dynamic Content Area -->
-          <div id="inventory-content">
-            <div
-              class="skeleton"
-              style="height: 400px; border-radius: 14px"
-            ></div>
-          </div>
-
-          <!-- Pagination -->
-          <div id="inventory-pagination"></div>
-        </main>
-      </div>
+        <!-- Low Stock Tab -->
+        <div class="tab-panel" id="tab-lowstock" style="display: none">
+          <div id="lowstock-container"></div>
+        </div>
+      </main>
     </div>
 
     <!-- Receive Stock Modal -->
-    <div class="modal-backdrop" id="receive-stock-modal">
+    <div class="modal-backdrop" id="receive-modal" style="display: none">
       <div class="modal">
         <div class="modal__header">
-          <div class="modal__title">Receive Stock</div>
-          <button class="modal__close" id="receive-stock-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Receive Stock</h3>
+          <button class="modal__close" id="receive-modal-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
           <div class="form-group">
-            <label class="form-label required">Product ID</label
-            ><input
+            <label class="form-label">Product ID</label>
+            <input
               type="text"
               class="form-input"
               id="receive-product"
@@ -236,27 +118,30 @@
             />
           </div>
           <div class="form-group">
-            <label class="form-label required">Warehouse</label
-            ><select class="form-select" id="receive-warehouse">
-              <option value="">Select warehouse</option>
-            </select>
+            <label class="form-label">Warehouse ID</label>
+            <input
+              type="text"
+              class="form-input"
+              id="receive-warehouse"
+              placeholder="Warehouse UUID"
+            />
           </div>
           <div class="form-group">
-            <label class="form-label required">Quantity</label
-            ><input
+            <label class="form-label">Quantity</label>
+            <input
               type="number"
               class="form-input"
-              id="receive-quantity"
+              id="receive-qty"
               min="1"
-              placeholder="100"
+              placeholder="Quantity"
             />
           </div>
         </div>
         <div class="modal__footer">
-          <button class="btn btn--secondary" id="receive-stock-cancel-footer">
+          <button class="btn btn--ghost" id="receive-modal-cancel">
             Cancel
           </button>
-          <button class="btn btn--primary" id="receive-stock-submit">
+          <button class="btn btn--primary" id="receive-modal-submit">
             Receive
           </button>
         </div>
@@ -264,30 +149,18 @@
     </div>
 
     <!-- Transfer Stock Modal -->
-    <div class="modal-backdrop" id="transfer-stock-modal">
+    <div class="modal-backdrop" id="transfer-modal" style="display: none">
       <div class="modal">
         <div class="modal__header">
-          <div class="modal__title">Transfer Stock</div>
-          <button class="modal__close" id="transfer-stock-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Transfer Stock</h3>
+          <button class="modal__close" id="transfer-modal-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
           <div class="form-group">
-            <label class="form-label required">Product ID</label
-            ><input
+            <label class="form-label">Product ID</label>
+            <input
               type="text"
               class="form-input"
               id="transfer-product"
@@ -295,33 +168,39 @@
             />
           </div>
           <div class="form-group">
-            <label class="form-label required">From Warehouse</label
-            ><select class="form-select" id="transfer-from-warehouse">
-              <option value="">Select source</option>
-            </select>
+            <label class="form-label">From Warehouse</label>
+            <input
+              type="text"
+              class="form-input"
+              id="transfer-from"
+              placeholder="From warehouse UUID"
+            />
           </div>
           <div class="form-group">
-            <label class="form-label required">To Warehouse</label
-            ><select class="form-select" id="transfer-to-warehouse">
-              <option value="">Select destination</option>
-            </select>
+            <label class="form-label">To Warehouse</label>
+            <input
+              type="text"
+              class="form-input"
+              id="transfer-to"
+              placeholder="To warehouse UUID"
+            />
           </div>
           <div class="form-group">
-            <label class="form-label required">Quantity</label
-            ><input
+            <label class="form-label">Quantity</label>
+            <input
               type="number"
               class="form-input"
-              id="transfer-quantity"
+              id="transfer-qty"
               min="1"
-              placeholder="50"
+              placeholder="Quantity"
             />
           </div>
         </div>
         <div class="modal__footer">
-          <button class="btn btn--secondary" id="transfer-stock-cancel-footer">
+          <button class="btn btn--ghost" id="transfer-modal-cancel">
             Cancel
           </button>
-          <button class="btn btn--primary" id="transfer-stock-submit">
+          <button class="btn btn--primary" id="transfer-modal-submit">
             Transfer
           </button>
         </div>
@@ -329,30 +208,18 @@
     </div>
 
     <!-- Adjust Stock Modal -->
-    <div class="modal-backdrop" id="adjust-stock-modal">
+    <div class="modal-backdrop" id="adjust-modal" style="display: none">
       <div class="modal">
         <div class="modal__header">
-          <div class="modal__title">Adjust Stock</div>
-          <button class="modal__close" id="adjust-stock-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Adjust Stock</h3>
+          <button class="modal__close" id="adjust-modal-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
           <div class="form-group">
-            <label class="form-label required">Product ID</label
-            ><input
+            <label class="form-label">Product ID</label>
+            <input
               type="text"
               class="form-input"
               id="adjust-product"
@@ -360,38 +227,38 @@
             />
           </div>
           <div class="form-group">
-            <label class="form-label required">Warehouse</label
-            ><select class="form-select" id="adjust-warehouse">
-              <option value="">Select warehouse</option>
-            </select>
+            <label class="form-label">Warehouse ID</label>
+            <input
+              type="text"
+              class="form-input"
+              id="adjust-warehouse"
+              placeholder="Warehouse UUID"
+            />
           </div>
           <div class="form-group">
-            <label class="form-label required">Quantity Change</label
-            ><input
+            <label class="form-label">Quantity Delta</label>
+            <input
               type="number"
               class="form-input"
-              id="adjust-quantity"
-              placeholder="-10 or +20"
+              id="adjust-qty"
+              placeholder="+10 to add, -5 to remove"
             />
-            <div class="form-hint">
-              Use negative values to decrease, positive to increase.
-            </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Reason</label
-            ><input
+            <label class="form-label">Reason</label>
+            <input
               type="text"
               class="form-input"
               id="adjust-reason"
-              placeholder="e.g. damaged, audit correction"
+              placeholder="Reason for adjustment"
             />
           </div>
         </div>
         <div class="modal__footer">
-          <button class="btn btn--secondary" id="adjust-stock-cancel-footer">
+          <button class="btn btn--ghost" id="adjust-modal-cancel">
             Cancel
           </button>
-          <button class="btn btn--primary" id="adjust-stock-submit">
+          <button class="btn btn--primary" id="adjust-modal-submit">
             Adjust
           </button>
         </div>

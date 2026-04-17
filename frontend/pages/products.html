@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Products — SCM Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../css/global.css" />
+    <link rel="stylesheet" href="../css/layout.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div id="sidebar-container"></div>
+      <main class="main-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-header__title">Products</h1>
+            <p class="page-header__subtitle" id="products-subtitle">Loading…</p>
+          </div>
+          <div class="page-header__actions">
+            <button class="btn btn--primary" id="btn-new-product">
+              <i data-lucide="plus" style="width: 16px; height: 16px"></i> New
+              Product
+            </button>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metric-row" id="product-metrics">
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="toolbar__search">
+            <i data-lucide="search"></i>
+            <input
+              type="text"
+              class="form-input"
+              id="search-input"
+              placeholder="Search products…"
+            />
+          </div>
+          <select class="form-select" id="filter-category">
+            <option value="">All categories</option>
+          </select>
+          <select class="form-select" id="filter-abc">
+            <option value="">All classes</option>
+            <option value="A">Class A</option>
+            <option value="B">Class B</option>
+            <option value="C">Class C</option>
+          </select>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrapper" id="products-table-container"></div>
+        <div id="products-pagination"></div>
+      </main>
+    </div>
+
+    <!-- Create Product Modal -->
+    <div class="modal-backdrop" id="create-modal" style="display: none">
+      <div class="modal" style="max-width: 520px">
+        <div class="modal__header">
+          <h3 class="modal__title">Create Product</h3>
+          <button class="modal__close" id="create-modal-close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input
+              type="text"
+              class="form-input"
+              id="create-name"
+              placeholder="Product name"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">SKU</label>
+            <input
+              type="text"
+              class="form-input"
+              id="create-sku"
+              placeholder="SKU code"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="create-category">
+              <option value="">Select category</option>
+            </select>
+          </div>
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem"
+          >
+            <div class="form-group">
+              <label class="form-label">Unit Cost</label>
+              <input
+                type="number"
+                class="form-input"
+                id="create-cost"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Unit Price</label>
+              <input
+                type="number"
+                class="form-input"
+                id="create-price"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem"
+          >
+            <div class="form-group">
+              <label class="form-label">Weight (kg)</label>
+              <input
+                type="number"
+                class="form-input"
+                id="create-weight"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Reorder Point</label>
+              <input
+                type="number"
+                class="form-input"
+                id="create-reorder"
+                min="0"
+                placeholder="0"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--ghost" id="create-modal-cancel">
+            Cancel
+          </button>
+          <button class="btn btn--primary" id="create-modal-submit">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Detail Modal -->
+    <div class="modal-backdrop" id="detail-modal" style="display: none">
+      <div class="modal" style="max-width: 600px">
+        <div class="modal__header">
+          <h3 class="modal__title" id="detail-modal-title">Product Detail</h3>
+          <button class="modal__close" id="detail-modal-close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal__body" id="detail-modal-body"></div>
+      </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+    <script type="module" src="../js/products.js"></script>
+  </body>
+</html>

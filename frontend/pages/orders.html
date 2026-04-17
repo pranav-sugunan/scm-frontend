@@ -4,353 +4,210 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Orders — SCM Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="../css/global.css" />
     <link rel="stylesheet" href="../css/layout.css" />
     <link rel="stylesheet" href="../css/components.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   </head>
   <body>
     <div class="app-shell">
       <div id="sidebar-container"></div>
-
-      <div style="flex: 1; min-width: 0">
-        <div id="navbar-container"></div>
-
-        <main class="main-content">
-          <!-- Page Header -->
-          <div class="page-header">
-            <div class="page-header__left">
-              <h1 class="page-header__title">Orders</h1>
-              <p class="page-header__subtitle" id="orders-count">Loading…</p>
-            </div>
-            <div class="page-header__actions">
-              <button class="btn btn--primary" id="create-order-btn">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  style="width: 18px; height: 18px"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                New Order
-              </button>
-              <span
-                class="badge badge--info"
-                style="font-size: 0.75rem; padding: 0.375rem 0.75rem"
-              >
-                Auto-refresh 10s
-              </span>
-            </div>
+      <main class="main-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-header__title">Orders</h1>
+            <p class="page-header__subtitle" id="orders-subtitle">Loading…</p>
           </div>
-
-          <!-- Toolbar -->
-          <div class="toolbar">
-            <!-- Search -->
-            <div class="toolbar__search">
-              <svg
-                class="toolbar__search-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                type="search"
-                class="toolbar__search-input"
-                id="search-orders"
-                placeholder="Search by ID, customer, SKU…"
-                autocomplete="off"
-              />
-            </div>
-
-            <div class="toolbar__sep"></div>
-
-            <!-- Filters -->
-            <div class="toolbar__filter-group">
-              <span class="toolbar__filter-label">Status:</span>
-              <select class="toolbar__select" id="filter-status">
-                <option value="">All Statuses</option>
-                <option value="created">Created</option>
-                <option value="allocated">Allocated</option>
-                <option value="picked">Picked</option>
-                <option value="packed">Packed</option>
-                <option value="shipped">Shipped</option>
-                <option value="in_transit">In Transit</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="returned">Returned</option>
-              </select>
-
-              <span class="toolbar__filter-label">Priority:</span>
-              <select class="toolbar__select" id="filter-priority">
-                <option value="">All Priorities</option>
-                <option value="critical">Critical</option>
-                <option value="express">Express</option>
-                <option value="standard">Standard</option>
-              </select>
-
-              <span class="toolbar__filter-label">Warehouse:</span>
-              <select class="toolbar__select" id="filter-warehouse">
-                <option value="">All Warehouses</option>
-              </select>
-            </div>
-
-            <div class="toolbar__right">
-              <button class="btn btn--ghost btn--sm" id="clear-filters">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-                Clear
-              </button>
-            </div>
+          <div class="page-header__actions">
+            <button class="btn btn--primary" id="btn-new-order">
+              <i data-lucide="plus" style="width: 16px; height: 16px"></i> New
+              Order
+            </button>
           </div>
+        </div>
 
-          <!-- Table -->
-          <div id="orders-table-container">
-            <div
-              class="skeleton"
-              style="height: 400px; border-radius: 14px"
-            ></div>
+        <!-- Analytics Metrics -->
+        <div class="metric-row" id="order-metrics">
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+        </div>
+
+        <!-- Pipeline -->
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-head__title">Pipeline</h2>
+            <span class="text-xs text-muted" id="pipeline-hint"
+              >Click a stage to filter</span
+            >
           </div>
+          <div id="order-pipeline"></div>
+        </section>
 
-          <!-- Pagination -->
-          <div id="orders-pagination-container"></div>
-        </main>
-      </div>
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="toolbar__search">
+            <i data-lucide="search"></i>
+            <input
+              type="text"
+              class="form-input"
+              id="search-input"
+              placeholder="Search orders…"
+            />
+          </div>
+          <select class="form-select" id="filter-status">
+            <option value="">All statuses</option>
+            <option value="created">Created</option>
+            <option value="allocated">Allocated</option>
+            <option value="picked">Picked</option>
+            <option value="packed">Packed</option>
+            <option value="shipped">Shipped</option>
+            <option value="in_transit">In Transit</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="returned">Returned</option>
+          </select>
+          <select class="form-select" id="filter-priority">
+            <option value="">All priorities</option>
+            <option value="critical">Critical</option>
+            <option value="express">Express</option>
+            <option value="standard">Standard</option>
+          </select>
+          <button
+            class="btn btn--ghost btn--sm"
+            id="btn-clear-filters"
+            style="display: none"
+          >
+            <i data-lucide="x"></i> Clear
+          </button>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrapper" id="orders-table-container"></div>
+        <div id="orders-pagination"></div>
+      </main>
     </div>
 
-    <!-- ===================================================
-       STATUS UPDATE MODAL
-       =================================================== -->
-    <div class="modal-backdrop" id="modal-backdrop">
+    <!-- Status Update Modal -->
+    <div class="modal-backdrop" id="status-modal" style="display: none">
       <div class="modal">
         <div class="modal__header">
-          <div class="modal__title">
-            Update Order Status
-            <span
-              class="text-muted font-normal"
-              style="font-size: 0.875rem"
-              id="modal-order-id"
-            ></span>
-          </div>
-          <button class="modal__close" id="modal-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Update Status</h3>
+          <button class="modal__close" id="status-modal-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
+          <p id="status-modal-info" class="text-sm text-muted mb-3"></p>
           <div class="form-group">
-            <label class="form-label">Current Status</label>
-            <div id="modal-current-status" style="margin-top: 0.25rem"></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label required" for="modal-new-status"
-              >New Status</label
-            >
-            <select class="form-select" id="modal-new-status"></select>
-            <div class="form-hint">
-              Select the new lifecycle status for this order.
-            </div>
+            <label class="form-label">New Status</label>
+            <select class="form-select" id="status-modal-select">
+              <option value="created">Created</option>
+              <option value="allocated">Allocated</option>
+              <option value="picked">Picked</option>
+              <option value="packed">Packed</option>
+              <option value="shipped">Shipped</option>
+              <option value="in_transit">In Transit</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="exception">Exception</option>
+              <option value="returned">Returned</option>
+            </select>
           </div>
         </div>
         <div class="modal__footer">
-          <button
-            class="btn btn--secondary"
-            id="modal-cancel-footer"
-            onclick="
-              document
-                .getElementById('modal-backdrop')
-                .classList.remove('active')
-            "
-          >
+          <button class="btn btn--ghost" id="status-modal-cancel">
             Cancel
           </button>
-          <button class="btn btn--primary" id="modal-confirm">
-            Save Changes
+          <button class="btn btn--primary" id="status-modal-confirm">
+            Update
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ===================================================
-       CREATE ORDER MODAL
-       =================================================== -->
-    <div class="modal-backdrop" id="create-order-modal">
-      <div class="modal" style="max-width: 600px">
+    <!-- Create Order Modal -->
+    <div class="modal-backdrop" id="create-modal" style="display: none">
+      <div class="modal" style="max-width: 560px">
         <div class="modal__header">
-          <div class="modal__title">Create New Order</div>
-          <button class="modal__close" id="create-order-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Create Order</h3>
+          <button class="modal__close" id="create-modal-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
-          <div
-            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem"
-          >
-            <div class="form-group">
-              <label class="form-label required" for="create-order-customer"
-                >Customer ID</label
-              >
-              <input
-                type="text"
-                class="form-input"
-                id="create-order-customer"
-                placeholder="e.g. CUST-001"
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="create-order-customer-name"
-                >Customer Name</label
-              >
-              <input
-                type="text"
-                class="form-input"
-                id="create-order-customer-name"
-                placeholder="John Doe"
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="create-order-priority"
-                >Priority</label
-              >
-              <select class="form-select" id="create-order-priority">
-                <option value="standard">Standard</option>
-                <option value="express">Express</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="create-order-channel"
-                >Channel</label
-              >
-              <input
-                type="text"
-                class="form-input"
-                id="create-order-channel"
-                placeholder="e.g. web, api"
-              />
-            </div>
-            <div class="form-group" style="grid-column: span 2">
-              <label class="form-label" for="create-order-address"
-                >Shipping Address</label
-              >
-              <input
-                type="text"
-                class="form-input"
-                id="create-order-address"
-                placeholder="123 Main St, City, ST"
-              />
-            </div>
+          <div class="form-group">
+            <label class="form-label">Customer Name</label>
+            <input
+              type="text"
+              class="form-input"
+              id="create-customer"
+              placeholder="Customer name"
+            />
           </div>
-          <div style="margin-top: 1rem">
-            <div
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 0.5rem;
-              "
-            >
-              <span class="form-label" style="margin: 0">Order Items</span>
-              <button class="btn btn--ghost btn--sm" id="add-order-item-btn">
-                + Add Item
-              </button>
-            </div>
-            <div id="order-items-container"></div>
+          <div class="form-group">
+            <label class="form-label">Customer ID</label>
+            <input
+              type="text"
+              class="form-input"
+              id="create-customer-id"
+              placeholder="Customer ID"
+            />
           </div>
+          <div class="form-group">
+            <label class="form-label">Priority</label>
+            <select class="form-select" id="create-priority">
+              <option value="standard">Standard</option>
+              <option value="express">Express</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Shipping Address</label>
+            <textarea
+              class="form-textarea"
+              id="create-address"
+              rows="2"
+              placeholder="Shipping address"
+            ></textarea>
+          </div>
+          <div class="section-head" style="margin-top: 1rem">
+            <h4 class="section-head__title">Order Items</h4>
+            <button class="btn btn--ghost btn--sm" id="btn-add-item">
+              <i data-lucide="plus" style="width: 14px; height: 14px"></i> Add
+              Item
+            </button>
+          </div>
+          <div id="order-items-container"></div>
         </div>
         <div class="modal__footer">
-          <button class="btn btn--secondary" id="create-order-cancel-footer">
+          <button class="btn btn--ghost" id="create-modal-cancel">
             Cancel
           </button>
-          <button class="btn btn--primary" id="create-order-submit">
+          <button class="btn btn--primary" id="create-modal-submit">
             Create Order
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ===================================================
-       ORDER DETAIL MODAL
-       =================================================== -->
-    <div
-      class="modal-backdrop"
-      id="order-detail-modal"
-      onclick="if (event.target === this) this.classList.remove('active');"
-    >
-      <div class="modal" style="max-width: 700px">
+    <!-- Order Detail Modal -->
+    <div class="modal-backdrop" id="detail-modal" style="display: none">
+      <div class="modal" style="max-width: 640px">
         <div class="modal__header">
-          <div class="modal__title">Order Details</div>
-          <button
-            class="modal__close"
-            onclick="
-              document
-                .getElementById('order-detail-modal')
-                .classList.remove('active')
-            "
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title" id="detail-modal-title">Order Detail</h3>
+          <button class="modal__close" id="detail-modal-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
-        <div class="modal__body" id="order-detail-content"></div>
+        <div class="modal__body" id="detail-modal-body"></div>
       </div>
     </div>
 

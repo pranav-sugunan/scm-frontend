@@ -1,133 +1,197 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dashboard — SCM Platform</title>
-  <link rel="stylesheet" href="../css/global.css"/>
-  <link rel="stylesheet" href="../css/layout.css"/>
-  <link rel="stylesheet" href="../css/components.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-</head>
-<body>
-  <div class="app-shell">
-    <!-- Sidebar injected by JS -->
-    <div id="sidebar-container"></div>
-
-    <div style="flex:1;min-width:0">
-      <!-- Navbar injected by JS -->
-      <div id="navbar-container"></div>
-
-      <!-- Main Content -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — SCM Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../css/global.css" />
+    <link rel="stylesheet" href="../css/layout.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div id="sidebar-container"></div>
       <main class="main-content">
-
-        <!-- Page Header -->
         <div class="page-header">
-          <div class="page-header__left">
-            <h1 class="page-header__title">Operations Dashboard</h1>
-            <p class="page-header__subtitle">Real-time supply chain visibility — auto-refreshes every 10s</p>
-          </div>
-          <div class="page-header__actions">
-            <button class="btn btn--secondary btn--sm" onclick="window.location.reload()">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              Refresh
-            </button>
+          <div>
+            <h1 class="page-header__title">Dashboard</h1>
+            <p class="page-header__subtitle">
+              Supply chain overview with AI insights
+            </p>
           </div>
         </div>
 
-        <!-- KPI Cards -->
-        <div class="kpi-grid" id="kpi-container">
-          <!-- Skeleton loading -->
-          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
-          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
-          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
-          <div class="kpi-card"><div class="skeleton" style="height:120px;border-radius:10px"></div></div>
+        <!-- KPI Metrics -->
+        <div class="metric-row" id="kpi-container">
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
         </div>
 
-        <!-- Charts Row -->
-        <div class="charts-grid">
-          <!-- Orders Over Time -->
-          <div class="chart-card">
-            <div class="chart-card__header">
-              <div>
-                <div class="chart-card__title">Orders Over Time</div>
-                <div class="chart-card__subtitle">Daily order volume trend</div>
-              </div>
-              <span class="badge badge--info">Live</span>
+        <!-- Order Pipeline -->
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-head__title">Order Pipeline</h2>
+            <a href="orders.html" class="link-action">All orders →</a>
+          </div>
+          <div id="order-pipeline"></div>
+        </section>
+
+        <!-- Charts -->
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel__head">
+              <h3 class="panel__title">Fulfillment Rates</h3>
             </div>
-            <div class="chart-card__body">
-              <div class="chart-wrapper">
+            <div class="panel__body">
+              <div class="chart-wrap" style="height: 240px">
                 <canvas id="orders-chart"></canvas>
               </div>
             </div>
           </div>
-
-          <!-- Inventory Distribution -->
-          <div class="chart-card">
-            <div class="chart-card__header">
-              <div>
-                <div class="chart-card__title">Inventory Distribution</div>
-                <div class="chart-card__subtitle">Stock by category</div>
-              </div>
+          <div class="panel">
+            <div class="panel__head">
+              <h3 class="panel__title">Inventory Health</h3>
             </div>
-            <div class="chart-card__body">
-              <div class="chart-wrapper">
+            <div class="panel__body">
+              <div class="chart-wrap" style="height: 240px">
                 <canvas id="inventory-chart"></canvas>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Bottom Row: Recent Orders + Alerts -->
-        <div class="two-col-grid" style="gap:1rem">
-          <!-- Recent Orders -->
-          <div class="section">
-            <div class="section-header">
-              <div>
-                <div class="section-title">Recent Orders</div>
-                <div class="section-subtitle">Latest 8 orders</div>
-              </div>
-              <a href="orders.html" class="btn btn--ghost btn--sm">
-                View all
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-              </a>
-            </div>
-            <div id="recent-orders-container">
-              <div class="skeleton" style="height:200px;border-radius:10px"></div>
+        <!-- AI Insights -->
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-head__title">
+              <i
+                data-lucide="sparkles"
+                style="
+                  width: 16px;
+                  height: 16px;
+                  vertical-align: -2px;
+                  margin-right: 4px;
+                "
+              ></i>
+              AI Insights
+            </h2>
+            <span class="text-xs text-muted"
+              >Forecast signals and anomaly alerts</span
+            >
+          </div>
+          <div class="analytics-banner" id="ai-insights-banner">
+            <div class="analytics-banner__item">
+              <div class="analytics-banner__value">--</div>
+              <div class="analytics-banner__label">Loading</div>
             </div>
           </div>
-
-          <!-- Low Stock Alerts -->
-          <div class="section">
-            <div class="section-header">
-              <div>
-                <div class="section-title">Stock Alerts</div>
-                <div class="section-subtitle">Items below reorder point</div>
+          <div class="grid-2" style="margin-top: 0.75rem">
+            <div class="panel">
+              <div class="panel__head">
+                <h3 class="panel__title">AI Anomaly Feed</h3>
               </div>
-              <a href="inventory.html" class="btn btn--ghost btn--sm">
-                View all
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-              </a>
+              <div class="panel__body" id="ai-anomalies"></div>
             </div>
-            <div id="alerts-container">
-              <div class="skeleton" style="height:200px;border-radius:10px"></div>
+            <div class="panel">
+              <div class="panel__head">
+                <h3 class="panel__title">
+                  <i
+                    data-lucide="trending-up"
+                    style="width: 14px; height: 14px; color: var(--clr-primary)"
+                  ></i>
+                  Demand Forecast (14 Days)
+                </h3>
+              </div>
+              <div class="panel__body">
+                <div
+                  class="forecast-controls"
+                  style="
+                    display: flex;
+                    gap: 0.5rem;
+                    align-items: center;
+                    margin-bottom: 0.75rem;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <select
+                    class="toolbar__select"
+                    id="forecast-product-sel"
+                    style="flex: 1; min-width: 140px; max-width: none"
+                  >
+                    <option value="">Select a product…</option>
+                  </select>
+                  <select
+                    class="toolbar__select"
+                    id="forecast-wh-sel"
+                    style="flex: 1; min-width: 120px; max-width: none"
+                  >
+                    <option value="">All warehouses</option>
+                  </select>
+                  <button
+                    class="btn btn--primary btn--sm"
+                    id="btn-run-forecast"
+                    style="flex-shrink: 0"
+                  >
+                    <i data-lucide="play" style="width: 13px; height: 13px"></i>
+                    Run
+                  </button>
+                </div>
+                <div
+                  class="chart-wrap"
+                  id="forecast-chart-wrap"
+                  style="height: 190px"
+                >
+                  <div class="empty-state" style="padding: 2rem">
+                    <div class="empty-state__title">Select a product above</div>
+                    <div class="empty-state__description">
+                      Choose a product and optionally a warehouse, then click
+                      Run to generate a 14-day demand forecast.
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="forecast-meta"
+                  id="forecast-meta"
+                  style="margin-top: 0.5rem"
+                ></div>
+              </div>
             </div>
+          </div>
+        </section>
+
+        <!-- Recent Activity -->
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel__head">
+              <h3 class="panel__title">Recent Orders</h3>
+              <a href="orders.html" class="link-action">View all →</a>
+            </div>
+            <div
+              class="panel__body panel__body--flush"
+              id="recent-orders"
+            ></div>
+          </div>
+          <div class="panel">
+            <div class="panel__head">
+              <h3 class="panel__title">Low Stock Alerts</h3>
+              <a href="inventory.html" class="link-action">View all →</a>
+            </div>
+            <div class="panel__body" id="alerts-container"></div>
           </div>
         </div>
-
       </main>
     </div>
-  </div>
-
-  <div id="toast-container" class="toast-container"></div>
-
-  <script type="module" src="../js/dashboard.js"></script>
-</body>
+    <div id="toast-container" class="toast-container"></div>
+    <script type="module" src="../js/dashboard.js"></script>
+  </body>
 </html>

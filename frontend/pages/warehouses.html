@@ -4,405 +4,338 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Warehouses — SCM Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="../css/global.css" />
     <link rel="stylesheet" href="../css/layout.css" />
     <link rel="stylesheet" href="../css/components.css" />
-    <style>
-      .warehouse-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 1rem;
-      }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   </head>
   <body>
     <div class="app-shell">
       <div id="sidebar-container"></div>
-
-      <div style="flex: 1; min-width: 0">
-        <div id="navbar-container"></div>
-
-        <main class="main-content">
-          <!-- Page Header -->
-          <div class="page-header">
-            <div class="page-header__left">
-              <h1 class="page-header__title">Warehouses</h1>
-              <p class="page-header__subtitle">
-                Facilities, zones, and bin management
-              </p>
-            </div>
-            <div class="page-header__actions">
-              <button class="btn btn--primary btn--sm" id="create-wh-btn">
-                + New Warehouse
-              </button>
-              <button class="btn btn--secondary btn--sm" id="create-zone-btn">
-                + Zone
-              </button>
-              <button class="btn btn--secondary btn--sm" id="create-bin-btn">
-                + Bin
-              </button>
-            </div>
-          </div>
-
-          <!-- Summary KPIs -->
-          <div
-            class="kpi-grid"
-            style="
-              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-              margin-bottom: 1.75rem;
-            "
-          >
-            <div class="kpi-card kpi-card--blue">
-              <div class="kpi-card__header">
-                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--blue">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <div class="kpi-card__value" id="stat-total-wh">—</div>
-              <div class="kpi-card__label">Total Warehouses</div>
-            </div>
-
-            <div class="kpi-card kpi-card--green">
-              <div class="kpi-card__header">
-                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--green">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <div class="kpi-card__value" id="stat-active-wh">—</div>
-              <div class="kpi-card__label">Active</div>
-            </div>
-
-            <div class="kpi-card kpi-card--purple">
-              <div class="kpi-card__header">
-                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--purple">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <div class="kpi-card__value" id="stat-capacity">—</div>
-              <div class="kpi-card__label">Total Capacity</div>
-            </div>
-
-            <div class="kpi-card kpi-card--yellow">
-              <div class="kpi-card__header">
-                <div class="kpi-card__icon-wrap kpi-card__icon-wrap--yellow">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <div class="kpi-card__value" id="stat-zones">—</div>
-              <div class="kpi-card__label">Total Zones</div>
-            </div>
-          </div>
-
-          <!-- Section Header -->
-          <div class="section-header">
-            <div>
-              <div class="section-title">All Warehouses</div>
-              <div class="section-subtitle">
-                Click a card to view zones and bins
-              </div>
-            </div>
-          </div>
-
-          <!-- Warehouse Cards Grid -->
-          <div id="warehouses-container">
-            <div class="warehouse-grid">
-              <div
-                class="skeleton"
-                style="height: 220px; border-radius: 14px"
-              ></div>
-              <div
-                class="skeleton"
-                style="height: 220px; border-radius: 14px"
-              ></div>
-              <div
-                class="skeleton"
-                style="height: 220px; border-radius: 14px"
-              ></div>
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-
-    <!-- ===================================================
-       ZONES MODAL
-       =================================================== -->
-    <div class="modal-backdrop" id="zones-modal-backdrop">
-      <div class="modal modal--wide">
-        <div class="modal__header">
+      <main class="main-content">
+        <div class="page-header">
           <div>
-            <div class="modal__title" id="modal-wh-name">Warehouse Zones</div>
-            <div
-              style="
-                font-size: 0.8125rem;
-                color: var(--clr-text-secondary);
-                margin-top: 0.125rem;
-              "
-              id="modal-wh-location"
-            ></div>
+            <h1 class="page-header__title">Warehouses</h1>
+            <p class="page-header__subtitle" id="wh-subtitle">Loading…</p>
           </div>
-          <button class="modal__close" id="modal-close-btn">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          <div class="page-header__actions">
+            <button class="btn btn--primary" id="btn-new-warehouse">
+              <i data-lucide="plus" style="width: 16px; height: 16px"></i> New
+              Warehouse
+            </button>
+          </div>
+        </div>
+
+        <!-- Overview Metrics -->
+        <div class="metric-row" id="wh-overview-metrics">
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+          <div class="metric-card skeleton-h"></div>
+        </div>
+
+        <!-- Warehouse Selector -->
+        <section class="section">
+          <div class="section-head">
+            <h2 class="section-head__title">Facilities</h2>
+            <span class="text-xs text-muted"
+              >Select a facility to view complete details</span
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
+          </div>
+          <div class="toolbar" style="margin-bottom: 0.75rem">
+            <div class="toolbar__search">
+              <i class="toolbar__search-icon" data-lucide="search"></i>
+              <input
+                id="wh-search"
+                class="form-input"
+                type="text"
+                placeholder="Search by name, code, city..."
               />
-            </svg>
-          </button>
-        </div>
-        <div class="modal__body" id="zones-content">
-          <div class="page-loading">
-            <div class="spinner"></div>
-            <span>Loading zones…</span>
+            </div>
+            <select class="toolbar__select" id="wh-status-filter">
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="maintenance">Maintenance</option>
+            </select>
+            <select class="toolbar__select" id="wh-type-filter">
+              <option value="">All Types</option>
+              <option value="fulfillment_center">Fulfillment Center</option>
+              <option value="distribution_center">Distribution Center</option>
+              <option value="cold_storage">Cold Storage</option>
+              <option value="regional_hub">Regional Hub</option>
+            </select>
+          </div>
+          <div class="table-wrapper" id="wh-table-container"></div>
+        </section>
+
+        <!-- Warehouse Detail (hidden initially) -->
+        <div id="wh-detail" style="display: none">
+          <div class="wh-info-bar" id="wh-info-bar"></div>
+          <div class="metric-row" id="wh-analytics"></div>
+
+          <!-- AI Simulation Panel -->
+          <div class="panel" style="margin-top: 0.75rem">
+            <div class="panel__head">
+              <h3 class="panel__title">
+                <i
+                  data-lucide="sparkles"
+                  style="width: 14px; height: 14px; color: var(--clr-primary)"
+                ></i>
+                AI Throughput Simulation
+              </h3>
+            </div>
+            <div class="panel__body" id="sim-results">
+              <div class="spinner spinner--sm" style="margin: 1rem auto"></div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top: 0.75rem">
+            <div class="panel__head">
+              <h3 class="panel__title">Floor Layout</h3>
+              <div style="display: flex; gap: 0.5rem">
+                <button class="btn btn--ghost btn--sm" id="btn-add-zone">
+                  <i data-lucide="plus" style="width: 14px; height: 14px"></i>
+                  Zone
+                </button>
+                <button class="btn btn--ghost btn--sm" id="btn-add-bin">
+                  <i data-lucide="plus" style="width: 14px; height: 14px"></i>
+                  Bin
+                </button>
+              </div>
+            </div>
+            <div class="panel__body" id="building-map-container"></div>
           </div>
         </div>
-      </div>
+
+        <!-- Empty state -->
+        <div id="wh-empty" class="empty-state" style="padding: 4rem">
+          <div class="empty-state__icon"><i data-lucide="warehouse"></i></div>
+          <div class="empty-state__title">Select a warehouse</div>
+          <div class="empty-state__description">
+            Click a warehouse above to view its details, zones, and bin layout.
+          </div>
+        </div>
+      </main>
     </div>
 
     <!-- Create Warehouse Modal -->
-    <div class="modal-backdrop" id="create-wh-modal">
-      <div class="modal">
+    <div class="modal-backdrop" id="create-wh-modal" style="display: none">
+      <div class="modal" style="max-width: 520px">
         <div class="modal__header">
-          <div class="modal__title">Create Warehouse</div>
-          <button class="modal__close" id="create-wh-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Create Warehouse</h3>
+          <button class="modal__close" id="create-wh-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input
+              type="text"
+              class="form-input"
+              id="wh-name"
+              placeholder="Warehouse name"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Code</label>
+            <input
+              type="text"
+              class="form-input"
+              id="wh-code"
+              placeholder="e.g. WH-MUM-01"
+            />
+          </div>
           <div
             style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem"
           >
             <div class="form-group">
-              <label class="form-label required">Name</label
-              ><input
+              <label class="form-label">Address</label>
+              <input
+                type="text"
                 class="form-input"
-                id="wh-name"
-                placeholder="Main Distribution Center"
+                id="wh-address"
+                placeholder="Street address"
               />
             </div>
             <div class="form-group">
-              <label class="form-label required">Code</label
-              ><input class="form-input" id="wh-code" placeholder="WH-001" />
+              <label class="form-label">City</label>
+              <input
+                type="text"
+                class="form-input"
+                id="wh-city"
+                placeholder="City"
+              />
             </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">State</label>
+            <input
+              type="text"
+              class="form-input"
+              id="wh-state"
+              placeholder="State"
+            />
+          </div>
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem"
+          >
             <div class="form-group">
-              <label class="form-label">Type</label
-              ><select class="form-select" id="wh-type">
-                <option value="standard">Standard</option>
-                <option value="cold_storage">Cold Storage</option>
+              <label class="form-label">Type</label>
+              <select class="form-select" id="wh-type">
+                <option value="fulfillment_center">Fulfillment Center</option>
                 <option value="distribution_center">Distribution Center</option>
-                <option value="cross_dock">Cross Dock</option>
+                <option value="cold_storage">Cold Storage</option>
+                <option value="regional_hub">Regional Hub</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">City</label
-              ><input class="form-input" id="wh-city" placeholder="Dallas" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">State</label
-              ><input class="form-input" id="wh-state" placeholder="TX" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Capacity (sqft)</label
-              ><input
+              <label class="form-label">Capacity (sqft)</label>
+              <input
                 type="number"
                 class="form-input"
                 id="wh-capacity"
-                placeholder="50000"
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Max Throughput/Day</label
-              ><input
-                type="number"
-                class="form-input"
-                id="wh-throughput"
-                placeholder="1000"
+                min="0"
+                placeholder="0"
               />
             </div>
           </div>
         </div>
         <div class="modal__footer">
-          <button class="btn btn--secondary" id="create-wh-cancel-footer">
-            Cancel
-          </button>
-          <button class="btn btn--primary" id="create-wh-submit">
-            Create Warehouse
-          </button>
+          <button class="btn btn--ghost" id="create-wh-cancel">Cancel</button>
+          <button class="btn btn--primary" id="create-wh-submit">Create</button>
         </div>
       </div>
     </div>
 
     <!-- Create Zone Modal -->
-    <div class="modal-backdrop" id="create-zone-modal">
+    <div class="modal-backdrop" id="create-zone-modal" style="display: none">
       <div class="modal">
         <div class="modal__header">
-          <div class="modal__title">Create Zone</div>
-          <button class="modal__close" id="create-zone-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Create Zone</h3>
+          <button class="modal__close" id="create-zone-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
           <div class="form-group">
-            <label class="form-label required">Warehouse</label
-            ><select class="form-select" id="zone-warehouse">
-              <option value="">Select warehouse</option>
-            </select>
+            <label class="form-label">Zone Name</label>
+            <input
+              type="text"
+              class="form-input"
+              id="zone-name"
+              placeholder="Zone name"
+            />
           </div>
           <div class="form-group">
-            <label class="form-label required">Zone Name</label
-            ><input class="form-input" id="zone-name" placeholder="Zone A" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Zone Type</label
-            ><select class="form-select" id="zone-type">
+            <label class="form-label">Zone Type</label>
+            <select class="form-select" id="zone-type">
               <option value="storage">Storage</option>
               <option value="picking">Picking</option>
-              <option value="packing">Packing</option>
               <option value="receiving">Receiving</option>
+              <option value="packing">Packing</option>
               <option value="shipping">Shipping</option>
+              <option value="cold">Cold</option>
+              <option value="hazmat">Hazmat</option>
             </select>
           </div>
         </div>
         <div class="modal__footer">
-          <button class="btn btn--secondary" id="create-zone-cancel-footer">
-            Cancel
-          </button>
+          <button class="btn btn--ghost" id="create-zone-cancel">Cancel</button>
           <button class="btn btn--primary" id="create-zone-submit">
-            Create Zone
+            Create
           </button>
         </div>
       </div>
     </div>
 
     <!-- Create Bin Modal -->
-    <div class="modal-backdrop" id="create-bin-modal">
+    <div class="modal-backdrop" id="create-bin-modal" style="display: none">
       <div class="modal">
         <div class="modal__header">
-          <div class="modal__title">Create Bin</div>
-          <button class="modal__close" id="create-bin-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+          <h3 class="modal__title">Create Bin</h3>
+          <button class="modal__close" id="create-bin-close">
+            <i data-lucide="x"></i>
           </button>
         </div>
         <div class="modal__body">
           <div class="form-group">
-            <label class="form-label required">Zone ID</label
-            ><input
-              class="form-input"
-              id="bin-zone-id"
-              placeholder="Zone UUID"
-            />
+            <label class="form-label">Zone</label>
+            <select class="form-select" id="bin-zone-select">
+              <option value="">Select zone</option>
+            </select>
           </div>
-          <div class="form-group">
-            <label class="form-label required">Bin Code</label
-            ><input class="form-input" id="bin-code" placeholder="BIN-A01" />
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr 1fr;
+              gap: 0.75rem;
+            "
+          >
+            <div class="form-group">
+              <label class="form-label">Aisle</label>
+              <input
+                type="text"
+                class="form-input"
+                id="bin-aisle"
+                placeholder="e.g. A"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rack</label>
+              <input
+                type="text"
+                class="form-input"
+                id="bin-rack"
+                placeholder="e.g. 01"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shelf</label>
+              <input
+                type="text"
+                class="form-input"
+                id="bin-shelf"
+                placeholder="e.g. 01"
+              />
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Capacity</label
-            ><input
-              type="number"
-              class="form-input"
-              id="bin-capacity"
-              placeholder="100"
-            />
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem"
+          >
+            <div class="form-group">
+              <label class="form-label">Bin Code</label>
+              <input
+                type="text"
+                class="form-input"
+                id="bin-code"
+                placeholder="e.g. A-01-01"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Capacity (units)</label>
+              <input
+                type="number"
+                class="form-input"
+                id="bin-capacity"
+                min="0"
+                value="100"
+              />
+            </div>
           </div>
         </div>
         <div class="modal__footer">
-          <button class="btn btn--secondary" id="create-bin-cancel-footer">
-            Cancel
-          </button>
+          <button class="btn btn--ghost" id="create-bin-cancel">Cancel</button>
           <button class="btn btn--primary" id="create-bin-submit">
-            Create Bin
+            Create
           </button>
         </div>
       </div>
